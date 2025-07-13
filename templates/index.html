@@ -1,113 +1,126 @@
 {% extends 'base.html' %}
 
 {% block title %}
-<title>Inventory Managmnet App</title>
+<title>Inventory Management App</title>
 {% endblock %}
-
 
 {% block content %}
 <main>
     <div class="container-fluid">
         <h1 class="mt-4">Dashboard</h1>
         <ol class="breadcrumb mb-4">
-            <li class="breadcrumb-item active">Dashboard</li>
+            <li class="breadcrumb-item active">Resumo de Sensores</li>
         </ol>
-        <div class="card mb-4">
-            <div class="card-header">Products</div>
-            <div class="card-body">
+        <div class="row">
+            <div class="col-md-4">
                 <div class="card mb-4">
-                <div class="card-header">
-                    <i class="fas fa-table mr-1"></i>
-                    Products Table
-                </div>
-                <div class="card-body">
-                    <div class="table-responsive">
-                        {% if products|length < 1 %}
-                        <h4>There are no Products, add one above</h4>
-                        {% else %}
-                        <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0">
-                            <thead>
-                                <tr>
-                                    <th>Product Name</th>
-                                    <th>Date</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tfoot>
-                                <tr>
-                                    <th>Product Name</th>
-                                    <th>Date</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </tfoot>
-                            <tbody>
-                                {% for product in products %}
-                                <tr>
-                                    <td>{{ product.product_id }}</td>
-                                    <td>{{ product.date_created.date() }}</td>
-                                    <td>
-                                        <a href="/delete-product/{{ product.product_id }}">Delete</a>
-                                        <br>
-                                        <a href="/update-product/{{ product.product_id }}">Update</a>  
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                        {% endif %}
+                    <div class="card-header">Sensores por Tipo de Device (%)</div>
+                    <div class="card-body">
+                        <canvas id="chartDevice"></canvas>
+                    </div>
                 </div>
             </div>
-                </div>
-            </div>
-        </div>
-        <div class="card mb-4">
-            <div class="card-header">Locations</div>
-            <div class="card-body">
+            <div class="col-md-4">
                 <div class="card mb-4">
-                <div class="card-header">
-                    <i class="fas fa-table mr-1"></i>
-                    Locations Table
-                </div>
-                <div class="card-body">
-                    <div class="table-responsive">
-                        {% if locations|length < 1 %}
-                        <h4>There are no Locations, add one above</h4>
-                        {% else %}
-                        <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0">
-                            <thead>
-                                <tr>
-                                    <th>Location Name</th>
-                                    <th>Date</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tfoot>
-                                <tr>
-                                    <th>Location Name</th>
-                                    <th>Date</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </tfoot>
-                            <tbody>
-                                {% for location in locations %}
-                                <tr>
-                                    <td>{{ location.location_id }}</td>
-                                    <td>{{ location.date_created.date() }}</td>
-                                    <td>
-                                        <a href="/delete-location/{{ location.location_id }}">Delete</a>
-                                        <br>
-                                        <a href="/update-location/{{ location.location_id }}">Update</a>  
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                        {% endif %}
+                    <div class="card-header">Sensores por Tipo de Sonda</div>
+                    <div class="card-body">
+                        <canvas id="chartTipoSonda"></canvas>
+                    </div>
                 </div>
             </div>
+            <div class="col-md-4">
+                <div class="card mb-4">
+                    <div class="card-header">Sensores por Status</div>
+                    <div class="card-body">
+                        <canvas id="chartStatus"></canvas>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 </main>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
+<script>
+    const deviceData = {{ sensores_por_device | tojson }};
+    const tipoSondaData = {{ sensores_por_tipo_sonda | tojson }};
+    const statusData = {{ sensores_por_status | tojson }};
+
+    new Chart(document.getElementById('chartDevice'), {
+        type: 'bar',
+        data: {
+            labels: deviceData.map(item => item[0]),
+            datasets: [{
+                label: 'Porcentagem (%)',
+                data: deviceData.map(item => item[1]),
+                backgroundColor: 'rgba(54, 162, 235, 0.7)',
+                borderColor: 'rgba(54, 162, 235, 1)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    max: 100,
+                    ticks: {
+                        callback: function(value) {
+                            return value + '%';
+                        }
+                    }
+                }
+            },
+            plugins: {
+                datalabels: {
+                    color: '#000',
+                    anchor: 'end',
+                    align: 'top',
+                    formatter: function(value, context) {
+                        const qtd = deviceData[context.dataIndex][2];
+                        return `${qtd} (${value}%)`;
+                    },
+                    font: {
+                        weight: 'bold'
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const qtd = deviceData[context.dataIndex][2];
+                            return `Qtd: ${qtd} — ${context.parsed.y}%`;
+                        }
+                    }
+                },
+                legend: {
+                    display: false
+                }
+            }
+        },
+        plugins: [ChartDataLabels]
+    });
+
+    new Chart(document.getElementById('chartTipoSonda'), {
+        type: 'bar',
+        data: {
+            labels: tipoSondaData.map(item => item[0]),
+            datasets: [{
+                label: 'Quantidade',
+                data: tipoSondaData.map(item => item[1]),
+                backgroundColor: 'rgba(255, 159, 64, 0.7)'
+            }]
+        }
+    });
+
+    new Chart(document.getElementById('chartStatus'), {
+        type: 'pie',
+        data: {
+            labels: statusData.map(item => item[0]),
+            datasets: [{
+                data: statusData.map(item => item[1]),
+                backgroundColor: ['#88DBDF', '#FF9CAF', '#F9E79F']
+            }]
+        }
+    });
+</script>
 {% endblock %}

@@ -1,0 +1,170 @@
+{% extends 'base.html' %}
+
+{% block title %}
+<title>Cadastro de Empresas</title>
+{% endblock %}
+
+{% block content %}
+<main>
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    {% for category, message in messages %}
+      <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      </div>
+    {% endfor %}
+  {% endif %}
+{% endwith %}
+
+<div class="container mt-4">
+    <h2>Cadastro de Empresas</h2>
+    <form method="POST" action="/cadastro/empresa">
+        <div class="row">
+            <div class="col-md-3 form-group">
+                <label for="cnpj">CNPJ:</label>
+                <input type="text" name="cnpj" id="cnpj" class="form-control" required>
+            </div>
+            <div class="col-md-5 form-group">
+                <label for="nome">Nome:</label>
+                <input type="text" name="nome" id="nome" class="form-control" required>
+            </div>
+            <div class="col-md-4 form-group">
+                <label for="telefone">Telefone:</label>
+                <input type="text" name="telefone" id="telefone" class="form-control">
+            </div>
+            <div class="col-md-6 form-group mt-2">
+                <label for="endereco">Endereço:</label>
+                <input type="text" name="endereco" id="endereco" class="form-control">
+            </div>
+            <div class="col-md-3 form-group mt-2">
+                <label for="cidade">Cidade:</label>
+                <input type="text" name="cidade" id="cidade" class="form-control">
+            </div>
+            <div class="col-md-2 form-group mt-2">
+                <label for="estado">Estado:</label>
+                <input type="text" name="estado" id="estado" class="form-control">
+            </div>
+            <div class="col-md-1 form-group mt-2">
+                <label for="cep">CEP:</label>
+                <input type="text" name="cep" id="cep" class="form-control">
+            </div>
+            <div class="col-md-6 form-group mt-2">
+                <label for="email">Email:</label>
+                <input type="email" name="email" id="email" class="form-control" placeholder="exemplo@email.com">
+            </div>
+            <div class="col-md-6 form-group mt-2">
+                <label for="contato">Contato:</label>
+                <input type="text" name="contato" id="contato" class="form-control" placeholder="Nome do responsável">
+            </div>
+        </div>
+        <button type="submit" class="btn btn-primary mt-3">Cadastrar</button>
+    </form>
+
+    <hr>
+
+    <h3 class="mt-4">Empresas Cadastradas</h3>
+    <a href="{{ url_for('exportar_empresas') }}" class="btn btn-success mb-3">Exportar Empresas</a>
+
+    <ul class="list-group">
+        {% for empresa in empresas %}
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+            <div>
+                <strong>{{ empresa.nome }}</strong> - {{ empresa.cidade }}, {{ empresa.estado }}
+            </div>
+            <div class="d-flex">
+  <button class="btn btn-outline-primary btn-sm me-1" onclick="toggleEdit({{ empresa.id }})">
+    <i class="fas fa-pen"></i>
+  </button>
+  <form action="{{ url_for('delete_empresa', id=empresa.id) }}" method="POST">
+    <button type="submit" class="btn btn-outline-danger btn-sm">
+      <i class="fas fa-trash"></i>
+    </button>
+  </form>
+</div>
+
+        </li>
+        <li class="list-group-item d-none" id="edit-form-{{ empresa.id }}">
+            <form action="{{ url_for('edit_empresa', id=empresa.id) }}" method="POST">
+                <div class="row">
+                    <div class="col-md-3">
+                        <label>Nome:</label>
+                        <input type="text" class="form-control" name="nome" value="{{ empresa.nome }}">
+                    </div>
+                    <div class="col-md-3">
+                        <label>CNPJ:</label>
+                        <input type="text" class="form-control" name="cnpj" value="{{ empresa.cnpj }}">
+                    </div>
+                    <div class="col-md-3">
+                        <label>Telefone:</label>
+                        <input type="text" class="form-control" name="telefone" value="{{ empresa.telefone }}">
+                    </div>
+                    <div class="col-md-6 mt-2">
+                        <label>Endereço:</label>
+                        <input type="text" class="form-control" name="endereco" value="{{ empresa.endereco }}">
+                    </div>
+                    <div class="col-md-3 mt-2">
+                        <label>Cidade:</label>
+                        <input type="text" class="form-control" name="cidade" value="{{ empresa.cidade }}">
+                    </div>
+                    <div class="col-md-2 mt-2">
+                        <label>Estado:</label>
+                        <input type="text" class="form-control" name="estado" value="{{ empresa.estado }}">
+                    </div>
+                    <div class="col-md-1 mt-2">
+                        <label>CEP:</label>
+                        <input type="text" class="form-control" name="cep" value="{{ empresa.cep }}">
+                    </div>
+                    <div class="col-md-6 mt-2">
+                        <label>Email:</label>
+                        <input type="email" class="form-control" name="email" value="{{ empresa.email }}">
+                    </div>
+                    <div class="col-md-6 mt-2">
+                        <label>Contato:</label>
+                        <input type="text" class="form-control" name="contato" value="{{ empresa.contato }}">
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-success mt-3">Salvar</button>
+            </form>
+        </li>
+        {% endfor %}
+    </ul>
+</div>
+</main>
+
+<script>
+    document.getElementById('cnpj').addEventListener('blur', function () {
+        const cnpj = this.value.replace(/\D/g, '');
+
+        if (cnpj.length !== 14) {
+            alert("CNPJ inválido.");
+            return;
+        }
+
+        fetch(`https://cors-anywhere.herokuapp.com/https://www.receitaws.com.br/v1/cnpj/${cnpj}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'ERROR') {
+                    alert("Erro ao buscar CNPJ: " + data.message);
+                    return;
+                }
+
+                document.getElementById('nome').value = data.nome || '';
+                document.getElementById('telefone').value = data.telefone || '';
+                document.getElementById('endereco').value = `${data.logradouro || ''} ${data.numero || ''} ${data.complemento || ''}`.trim();
+                document.getElementById('cidade').value = data.municipio || '';
+                document.getElementById('estado').value = data.uf || '';
+                document.getElementById('cep').value = data.cep || '';
+            })
+            .catch(error => {
+                alert("Erro ao consultar o CNPJ.");
+                console.error(error);
+            });
+    });
+
+    function toggleEdit(id) {
+        const form = document.getElementById(`edit-form-${id}`);
+        form.classList.toggle('d-none');
+    }
+</script>
+{% endblock %}

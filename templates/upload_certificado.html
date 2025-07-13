@@ -1,0 +1,28 @@
+{% extends 'base.html' %}
+
+{% block title %}
+<title>Upload de Certificado</title>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <h3 class="mb-4">Upload de Certificado - {{ sensor.nome }} ({{ sensor.codigo }})</h3>
+
+    <form action="{{ url_for('upload_certificado', id=sensor.id) }}" method="POST" enctype="multipart/form-data">
+        <div class="mb-3">
+            <label for="nome_certificado" class="form-label">Nome do Certificado</label>
+            <input type="text" name="nome_certificado" class="form-control" required>
+        </div>
+
+        <div class="mb-3">
+            <label for="certificado" class="form-label">Arquivo PDF</label>
+            <input type="file" name="certificado" accept="application/pdf" class="form-control" required>
+        </div>
+
+        <div class="d-flex gap-3">
+            <a href="{{ url_for('sensors') }}" class="btn btn-secondary">Cancelar</a>
+            <button type="submit" class="btn btn-primary">Enviar</button>
+        </div>
+    </form>
+</div>
+{% endblock %}

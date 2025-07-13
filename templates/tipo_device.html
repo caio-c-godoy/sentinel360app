@@ -1,0 +1,80 @@
+{% extends 'base.html' %}
+
+{% block title %}
+<title>Cadastro de Tipo de Device</title>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <h2 class="mb-4">Cadastro de Tipo de Device</h2>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ 'danger' if category == 'danger' else 'success' }}">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <form method="POST">
+        <div class="row mb-3">
+            <div class="col">
+                <input name="nome" class="form-control" placeholder="Nome do Tipo de Device" required>
+            </div>
+        </div>
+        <button type="submit" class="btn btn-primary">Cadastrar</button>
+    </form>
+
+    <h4 class="mt-4 mb-2">Registros Existentes</h4>
+    <table class="table table-bordered">
+        <thead>
+            <tr>
+                <th>Nome</th>
+                <th>Data de Criação</th>
+                <th>Ações</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for item in devices %}
+        <tr>
+            <td>
+                <span id="nome-text-{{ item.id }}">{{ item.nome }}</span>
+                <form id="form-edit-{{ item.id }}" action="{{ url_for('edit_tipo_device', id=item.id) }}" method="POST" class="d-none">
+                    <input type="text" name="nome" value="{{ item.nome }}" class="form-control form-control-sm">
+                </form>
+            </td>
+            <td>{{ item.criado_em.strftime('%d/%m/%Y %H:%M') }}</td>
+            <td>
+                <div class="d-flex flex-row" style="gap: 6px;">
+                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="toggleEdit({{ item.id }})" title="Editar">
+                        <i class="fas fa-pencil-alt"></i>
+                    </button>
+                    <form action="{{ url_for('delete_tipo_device', id=item.id) }}" method="POST" onsubmit="return confirm('Tem certeza que deseja excluir este tipo de device?');">
+                        <button type="submit" class="btn btn-sm btn-outline-danger" title="Excluir">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </form>
+                </div>
+            </td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<script>
+function toggleEdit(id) {
+    const span = document.getElementById('nome-text-' + id);
+    const form = document.getElementById('form-edit-' + id);
+
+    if (form.classList.contains('d-none')) {
+        span.classList.add('d-none');
+        form.classList.remove('d-none');
+    } else {
+        form.submit();
+    }
+}
+</script>
+{% endblock %}

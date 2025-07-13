@@ -1,0 +1,235 @@
+<style>
+    .table-responsive {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    table {
+        width: 100%;
+        table-layout: auto;
+    }
+
+    th, td {
+        white-space: nowrap;
+    }
+</style>
+
+{% extends 'base.html' %}
+
+{% block title %}
+<title>Cadastrar Sensor</title>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-3 py-4">
+    <h2 class="mb-4">Cadastrar Sensor</h2>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ 'danger' if category == 'danger' else 'success' }}">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <form method="POST">
+        <div class="row mb-3">
+            <div class="col">
+                <select name="nome" class="form-control" required>
+                    <option value="">Tipo de Device</option>
+                    {% for device in devices %}
+                        <option value="{{ device.nome }}">{{ device.nome }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col">
+                <input name="codigo" class="form-control" placeholder="Código" required>
+            </div>
+            <div class="col">
+                <select name="tipo" class="form-control" required>
+                    <option value="">Tipo de Sonda</option>
+                    {% for sonda in sondas %}
+                        <option value="{{ sonda.nome }}">{{ sonda.nome }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+
+        <div class="row mb-3">
+            <div class="col">
+                <select name="status" class="form-control" required>
+                    <option value="Em estoque">Em estoque</option>
+                    <option value="Em uso">Em uso</option>
+                    <option value="Manutenção">Manutenção</option>
+                </select>
+            </div>
+            <div class="col">
+                <input name="localizacao" class="form-control" placeholder="Localização">
+            </div>
+            <div class="col">
+                <select name="empresa" class="form-control" required>
+                    <option value="">Empresa</option>
+                    {% for emp in empresas %}
+                        <option value="{{ emp.nome }}">{{ emp.nome }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+
+<div class="row mb-3">
+    <div class="col">
+        <input type="text" name="responsavel_tec" class="form-control" placeholder="Responsável Técnico">
+    </div>
+    <div class="col">
+        <input type="text" name="contato" class="form-control" placeholder="Contato">
+    </div>
+    <div class="col">
+        <input type="text" name="nomenclatura" class="form-control" placeholder="Nomenclatura">
+    </div>
+</div>
+
+<div class="row mb-3">
+    <div class="col">
+        <input type="text" name="local_calibracao" class="form-control" placeholder="Local de Calibração">
+    </div>
+    <div class="col">
+        <input type="text" name="empresa_calibracao" class="form-control" placeholder="Empresa de Calibração">
+    </div>
+    <div class="col">
+        <input type="date" name="data_calibracao" class="form-control" placeholder="Data de Calibração">
+    </div>
+    <div class="col">
+        <input type="date" name="proxima_calibracao" class="form-control" placeholder="Próxima Calibração">
+    </div>
+</div>
+
+        <button type="submit" class="btn btn-primary">Cadastrar Sensor</button>
+    </form>
+
+    <form method="GET" class="mb-4 mt-4">
+        <div class="row g-2">
+            <div class="col-md-2">
+                <input type="text" name="filtro_nome" class="form-control" placeholder="Nome" value="{{ request.args.get('filtro_nome', '') }}">
+            </div>
+            <div class="col-md-2">
+                <input type="text" name="filtro_tipo" class="form-control" placeholder="Tipo" value="{{ request.args.get('filtro_tipo', '') }}">
+            </div>
+            <div class="col-md-2">
+                <select name="filtro_status" class="form-control">
+                    <option value="">Status</option>
+                    <option value="Em estoque" {% if request.args.get('filtro_status') == 'Em estoque' %}selected{% endif %}>Em estoque</option>
+                    <option value="Em uso" {% if request.args.get('filtro_status') == 'Em uso' %}selected{% endif %}>Em uso</option>
+                    <option value="Manutenção" {% if request.args.get('filtro_status') == 'Manutenção' %}selected{% endif %}>Manutenção</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <input type="text" name="filtro_empresa" class="form-control" placeholder="Empresa" value="{{ request.args.get('filtro_empresa', '') }}">
+            </div>
+            <div class="col-md-2">
+                <input type="text" name="filtro_localizacao" class="form-control" placeholder="Localização" value="{{ request.args.get('filtro_localizacao', '') }}">
+            </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-outline-primary w-100">Filtrar</button>
+            </div>
+        </div>
+    </form>
+
+    <div class="d-flex justify-content-between align-items-center mb-3 mt-4">
+        <h4 class="mb-0">Lista de Sensores</h4>
+        <button class="btn btn-success" onclick="exportarCSV()">Exportar CSV</button>
+    </div>
+
+    <div class="table-responsive">
+  <table class="table table-bordered mt-3" id="tabelaSensores">
+        <thead>
+            <tr>
+                <th>Tipo de Device</th>
+                <th>Código</th>
+                <th>Tipo de Sonda</th>
+                <th>Status</th>
+                <th>Localização</th>
+                <th>Empresa</th>
+                <th>Responsável Tec</th>
+                <th>Contato</th>
+                <th>Nomenclatura</th>
+                <th>Local Calibração</th>
+                <th>Empresa Calibração</th>
+                <th>Data Calibração</th>
+                <th>Próxima Calibração</th>
+                <th>Criado em</th>
+                <th>Ações</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for sensor in sensores %}
+            <tr>
+                <td>{{ sensor.nome }}</td>
+                <td>{{ sensor.codigo }}</td>
+                <td>{{ sensor.tipo }}</td>
+                <td>{{ sensor.status }}</td>
+                <td>{{ sensor.localizacao }}</td>
+                <td>{{ sensor.empresa }}</td>
+                <td>{{ sensor.responsavel_tec }}</td>
+                <td>{{ sensor.contato }}</td>
+                <td>{{ sensor.nomenclatura }}</td>
+                <td>{{ sensor.local_calibracao }}</td>
+                <td>{{ sensor.empresa_calibracao }}</td>
+                <td>{{ sensor.data_calibracao.strftime('%d/%m/%Y') if sensor.data_calibracao else '' }}</td>
+                <td>{{ sensor.proxima_calibracao.strftime('%d/%m/%Y') if sensor.proxima_calibracao else '' }}</td>
+                <td>{{ sensor.criado_em.strftime('%d/%m/%Y %H:%M') }}</td>
+                <td>
+                    <div class="d-flex flex-row" style="gap: 4px;">
+                        <form action="{{ url_for('edit_sensor', id=sensor.id) }}" method="GET">
+                            <button type="submit" class="btn btn-sm btn-outline-primary" title="Editar">
+                                <i class="fas fa-pencil-alt"></i>
+                            </button>
+                        </form>
+                        <form action="{{ url_for('delete_sensor', id=sensor.id) }}" method="POST" onsubmit="return confirm('Tem certeza que deseja excluir este sensor?');">
+                            <button type="submit" class="btn btn-sm btn-outline-danger" title="Excluir">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </form>
+                       <a href="{{ url_for('upload_certificado_form', id=sensor.id) }}" class="btn btn-sm btn-success" title="Upload de Certificado">
+                                <i class="fas fa-upload"></i>
+                        </a>
+                        {% if sensor.certificado_path %}
+                        <a href="{{ url_for('static', filename=sensor.certificado_path.replace('static/', '').replace('\\', '/')) }}" target="_blank" class="btn btn-sm btn-secondary" title="Ver PDF">
+                            <i class="fas fa-file-pdf"></i>
+                        </a>
+                        {% endif %}
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<script>
+    function exportarCSV() {
+        const tabela = document.getElementById("tabelaSensores");
+        const linhas = tabela.querySelectorAll("tr");
+        let csv = [];
+
+        for (let linha of linhas) {
+            let row = [];
+            const colunas = linha.querySelectorAll("th, td");
+            for (let celula of colunas) {
+                let texto = celula.innerText.replace(/"/g, '""');
+                row.push(`${texto}`);
+            }
+            csv.push(row.join(","));
+        }
+
+        const blob = new Blob([csv.join("\n")], { type: "text/csv;charset=utf-8;" });
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = "sensores.csv";
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+</script>
+{% endblock %}

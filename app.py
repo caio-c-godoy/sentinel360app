@@ -1,338 +1,452 @@
-from flask import Flask, render_template, url_for, request, redirect
+from flask import Flask, render_template, url_for, request, redirect, flash
 from flask_sqlalchemy import SQLAlchemy
-from collections import defaultdict
+from flask_migrate import Migrate
+from sqlalchemy import func
 from datetime import datetime
+from werkzeug.utils import secure_filename
+from models import TipoDevice, TipoSonda, Empresa
+
+
+import os
+
+from models import db, Empresa, TipoSonda, TipoDevice, Sensor
 
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///inventory.db'
-db = SQLAlchemy(app)
+app.secret_key = '1q2w3e!Q@W#E'
+
+# Caminho absoluto para o arquivo SQLite
+basedir = os.path.abspath(os.path.dirname(__file__))
+app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{os.path.join(basedir, 'inventory.db')}"
+
+# Debug config
+app.config['DEBUG'] = True
+app.config['PROPAGATE_EXCEPTIONS'] = True
+
+db.init_app(app)
+migrate = Migrate(app, db)
 
 
-class Product(db.Model):
-
-    __tablename__ = 'products'
-    product_id      = db.Column(db.String(200), primary_key=True)
-    date_created    = db.Column(db.DateTime, default=datetime.utcnow)
-
-    def __repr__(self):
-        return '<Product %r>' % self.product_id
-
-class Location(db.Model):
-    __tablename__   = 'locations'
-    location_id     = db.Column(db.String(200), primary_key=True)
-    date_created    = db.Column(db.DateTime, default=datetime.utcnow)
-    
-    def __repr__(self):
-        return '<Location %r>' % self.location_id
-
-class ProductMovement(db.Model):
-
-    __tablename__   = 'productmovements'
-    movement_id     = db.Column(db.Integer, primary_key=True)
-    product_id      = db.Column(db.Integer, db.ForeignKey('products.product_id'))
-    qty             = db.Column(db.Integer)
-    from_location   = db.Column(db.Integer, db.ForeignKey('locations.location_id'))
-    to_location     = db.Column(db.Integer, db.ForeignKey('locations.location_id'))
-    movement_time   = db.Column(db.DateTime, default=datetime.utcnow)
-
-    product         = db.relationship('Product', foreign_keys=product_id)
-    fromLoc         = db.relationship('Location', foreign_keys=from_location)
-    toLoc           = db.relationship('Location', foreign_keys=to_location)
-    
-    def __repr__(self):
-        return '<ProductMovement %r>' % self.movement_id
-
-@app.route('/', methods=["POST", "GET"])
+@app.route('/')
 def index():
-        
-    if (request.method == "POST") and ('product_name' in request.form):
-        product_name    = request.form["product_name"]
-        new_product     = Product(product_id=product_name)
+    sensores_por_device = db.session.query(TipoDevice.nome, func.count(Sensor.id))\
+        .select_from(Sensor)\
+        .join(TipoDevice, Sensor.tipo == TipoDevice.id)\
+        .group_by(TipoDevice.nome).all()
 
-        try:
-            db.session.add(new_product)
-            db.session.commit()
-            return redirect("/")
-        
-        except:
-            return "There Was an issue while add a new Product"
-    
-    if (request.method == "POST") and ('location_name' in request.form):
-        location_name    = request.form["location_name"]
-        new_location     = Location(location_id=location_name)
+    total_sensores = sum([count for _, count in sensores_por_device]) or 1
+    sensores_por_device_pct = [(nome, round(count / total_sensores * 100, 2), count) for nome, count in sensores_por_device]
 
-        try:
-            db.session.add(new_location)
-            db.session.commit()
-            return redirect("/")
-        
-        except:
-            return "There Was an issue while add a new Location"
-    else:
-        products    = Product.query.order_by(Product.date_created).all()
-        locations   = Location.query.order_by(Location.date_created).all()
-        return render_template("index.html", products = products, locations = locations)
+    sensores_por_tipo_sonda = db.session.query(TipoSonda.nome, func.count(Sensor.id))\
+        .select_from(Sensor)\
+        .join(TipoSonda, Sensor.tipo_sonda == TipoSonda.id)\
+        .group_by(TipoSonda.nome).all()
 
-@app.route('/locations/', methods=["POST", "GET"])
-def viewLocation():
-    if (request.method == "POST") and ('location_name' in request.form):
-        location_name = request.form["location_name"]
-        new_location = Location(location_id=location_name)
+    sensores_por_status_query = db.session.query(Sensor.status, func.count(Sensor.id))\
+        .group_by(Sensor.status).all()
 
-        try:
-            db.session.add(new_location)
-            db.session.commit()
-            return redirect("/locations/")
+    sensores_por_status = [
+        {"status": status, "count": count} for status, count in sensores_por_status_query
+    ]
 
-        except:
-            locations = Location.query.order_by(Location.date_created).all()
-            return "There Was an issue while add a new Location"
-    else:
-        locations = Location.query.order_by(Location.date_created).all()
-        return render_template("locations.html", locations=locations)
+    return render_template(
+        "index.html",
+        sensores_por_device=sensores_por_device_pct,
+        sensores_por_tipo_sonda=sensores_por_tipo_sonda,
+        sensores_por_status=sensores_por_status
+    )
 
-@app.route('/products/', methods=["POST", "GET"])
-def viewProduct():
-    if (request.method == "POST") and ('product_name' in request.form):
-        product_name = request.form["product_name"]
-        new_product = Product(product_id=product_name)
 
-        try:
-            db.session.add(new_product)
-            db.session.commit()
-            return redirect("/products/")
+UPLOAD_FOLDER = 'static/certificados'  # pasta onde salvará os arquivos
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-        except:
-            products = Product.query.order_by(Product.date_created).all()
-            return "There Was an issue while add a new Product"
-    else:
-        products = Product.query.order_by(Product.date_created).all()
-        return render_template("products.html", products=products)
+@app.route('/form-upload-certificado/<int:id>', methods=['GET'])
+def upload_certificado_form(id):
+    sensor = Sensor.query.get_or_404(id)
+    return render_template('upload_certificado.html', sensor=sensor)
 
-@app.route("/update-product/<name>", methods=["POST", "GET"])
-def updateProduct(name):
-    product = Product.query.get_or_404(name)
-    old_porduct = product.product_id
 
-    if request.method == "POST":
-        product.product_id    = request.form['product_name']
+@app.route('/upload-certificado/<int:id>', methods=['POST'])
+def upload_certificado(id):
+    sensor = Sensor.query.get_or_404(id)
+    arquivo = request.files.get('certificado')
+    nome_complemento = request.form.get('nome_certificado', '').strip()
 
-        try:
-            db.session.commit()
-            updateProductInMovements(old_porduct, request.form['product_name'])
-            return redirect("/products/")
+    if arquivo and arquivo.filename.endswith('.pdf'):
+        # Cria o nome seguro do arquivo
+        nome_base = f"Certificado_de_Calibracao_-_Sensor_{nome_complemento}"
+        nome_arquivo = secure_filename(nome_base + '.pdf')
 
-        except:
-            return "There was an issue while updating the Product"
-    else:
-        return render_template("update-product.html", product=product)
+        # Caminho completo e relativo
+        caminho_absoluto = os.path.join(UPLOAD_FOLDER, nome_arquivo)
+        caminho_relativo = os.path.join('certificados', nome_arquivo).replace("\\", "/")
 
-@app.route("/delete-product/<name>")
-def deleteProduct(name):
-    product_to_delete = Product.query.get_or_404(name)
-
-    try:
-        db.session.delete(product_to_delete)
+        # Salva o arquivo e atualiza o sensor
+        arquivo.save(caminho_absoluto)
+        sensor.certificado_path = caminho_relativo
         db.session.commit()
-        return redirect("/products/")
-    except:
-        return "There was an issue while deleteing the Product"
 
-@app.route("/update-location/<name>", methods=["POST", "GET"])
-def updateLocation(name):
-    location = Location.query.get_or_404(name)
-    old_location = location.location_id
+        flash('Certificado enviado com sucesso!', 'success')
+    else:
+        flash('Por favor, envie um arquivo PDF válido.', 'danger')
 
-    if request.method == "POST":
-        location.location_id = request.form['location_name']
+    return redirect(url_for('sensors'))  # redireciona para a listagem
+
+
+@app.route('/sensors', methods=["GET", "POST"])
+def sensors():
+    if request.method == 'POST':
+        nome = request.form['nome']
+        codigo = request.form['codigo']
+        tipo = request.form['tipo']
+        status = request.form['status']
+        localizacao = request.form['localizacao']
+        empresa = request.form['empresa']
+        responsavel_tec = request.form.get('responsavel_tec')
+        contato = request.form.get('contato')
+        data_calibracao = request.form.get('data_calibracao')
+        proxima_calibracao = request.form.get('proxima_calibracao')
+        nomenclatura = request.form.get('nomenclatura')
+        local_calibracao = request.form.get('local_calibracao')
+        empresa_calibracao = request.form.get('empresa_calibracao')
+
+        novo_sensor = Sensor(
+            nome=nome,
+            codigo=codigo,
+            tipo=tipo,
+            status=status,
+            localizacao=localizacao,
+            empresa=empresa,
+            responsavel_tec=responsavel_tec,
+            contato=contato,
+            data_calibracao=data_calibracao,
+            proxima_calibracao=proxima_calibracao,
+            nomenclatura=nomenclatura,
+            local_calibracao=local_calibracao,
+            empresa_calibracao=empresa_calibracao
+        )
 
         try:
+            db.session.add(novo_sensor)
             db.session.commit()
-            updateLocationInMovements(
-                old_location, request.form['location_name'])
-            return redirect("/locations/")
+            flash('Sensor cadastrado com sucesso!', 'success')
+            return redirect('/sensors')
+        except Exception as e:
+            db.session.rollback()
+            if 'UNIQUE constraint failed: sensors.codigo' in str(e):
+                flash('Erro: já existe um sensor com esse código.', 'danger')
+            else:
+                flash('Erro ao cadastrar o sensor.', 'danger')
 
-        except:
-            return "There was an issue while updating the Location"
-    else:
-        return render_template("update-location.html", location=location)
+    # FILTROS
+    filtro_nome = request.args.get('filtro_nome')
+    filtro_tipo = request.args.get('filtro_tipo')
+    filtro_status = request.args.get('filtro_status')
+    filtro_empresa = request.args.get('filtro_empresa')
+    filtro_localizacao = request.args.get('filtro_localizacao')
 
-@app.route("/delete-location/<name>")
-def deleteLocation(id):
-    location_to_delete = Location.query.get_or_404(id)
+    query = Sensor.query
 
+    if filtro_nome:
+        query = query.filter(Sensor.nome.ilike(f'%{filtro_nome}%'))
+    if filtro_tipo:
+        query = query.filter(Sensor.tipo.ilike(f'%{filtro_tipo}%'))
+    if filtro_status:
+        query = query.filter(Sensor.status.ilike(f'%{filtro_status}%'))
+    if filtro_empresa:
+        query = query.filter(Sensor.empresa.ilike(f'%{filtro_empresa}%'))
+    if filtro_localizacao:
+        query = query.filter(Sensor.localizacao.ilike(f'%{filtro_localizacao}%'))
+
+    sensores = query.order_by(Sensor.criado_em.desc()).all()
+
+    devices = TipoDevice.query.order_by(TipoDevice.nome).all()
+    sondas = TipoSonda.query.order_by(TipoSonda.nome).all()
+    empresas = Empresa.query.order_by(Empresa.nome).all()
+
+    return render_template(
+        'sensors.html',
+        sensores=sensores,
+        devices=devices,
+        sondas=sondas,
+        empresas=empresas
+    )
+
+
+@app.route('/delete_sensor/<int:id>', methods=['POST'])
+def delete_sensor(id):
+    sensor = Sensor.query.get_or_404(id)
     try:
-        db.session.delete(location_to_delete)
+        db.session.delete(sensor)
         db.session.commit()
-        return redirect("/locations/")
-    except:
-        return "There was an issue while deleteing the Location"
+        flash('Sensor excluído com sucesso!', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash('Erro ao excluir o sensor.', 'danger')
+    return redirect('/sensors')
 
-@app.route("/movements/", methods=["POST", "GET"])
-def viewMovements():
-    if request.method == "POST" :
-        product_id      = request.form["productId"]
-        qty             = request.form["qty"]
-        fromLocation    = request.form["fromLocation"]
-        toLocation      = request.form["toLocation"]
-        new_movement = ProductMovement(
-            product_id=product_id, qty=qty, from_location=fromLocation, to_location=toLocation)
+
+@app.route('/sensors/<int:id>/edit', methods=['GET', 'POST'])
+def edit_sensor(id):
+    sensor = Sensor.query.get_or_404(id)
+    devices = TipoDevice.query.all()
+    sondas = TipoSonda.query.all()
+    empresas = Empresa.query.all()
+
+    if request.method == 'POST':
+        sensor.tipo_device = request.form.get('tipo_device')
+        sensor.codigo = request.form.get('codigo')
+        sensor.tipo_sonda = request.form.get('tipo_sonda')
+        sensor.status = request.form.get('status')
+        sensor.localizacao = request.form.get('localizacao')
+        sensor.empresa = request.form.get('empresa')
+        sensor.responsavel_tec = request.form.get('responsavel_tec')
+        sensor.contato = request.form.get('contato')
+        sensor.nomenclatura = request.form.get('nomenclatura')
+        sensor.local_calibracao = request.form.get('local_calibracao')
+        sensor.empresa_calibracao = request.form.get('empresa_calibracao')
+        
+        # Datas com conversão segura
+        try:
+            sensor.data_calibracao = datetime.strptime(request.form.get('data_calibracao'), '%Y-%m-%d') if request.form.get('data_calibracao') else None
+        except:
+            sensor.data_calibracao = None
 
         try:
-            db.session.add(new_movement)
-            db.session.commit()
-            return redirect("/movements/")
-
+            sensor.proxima_calibracao = datetime.strptime(request.form.get('proxima_calibracao'), '%Y-%m-%d') if request.form.get('proxima_calibracao') else None
         except:
-            return "There Was an issue while add a new Movement"
-    else:
-        products    = Product.query.order_by(Product.date_created).all()
-        locations   = Location.query.order_by(Location.date_created).all()
-        movs = ProductMovement.query\
-        .join(Product, ProductMovement.product_id == Product.product_id)\
-        .add_columns(
-            ProductMovement.movement_id,
-            ProductMovement.qty,
-            Product.product_id, 
-            ProductMovement.from_location,
-            ProductMovement.to_location,
-            ProductMovement.movement_time)\
-        .all()
+            sensor.proxima_calibracao = None
 
-        movements   = ProductMovement.query.order_by(
-            ProductMovement.movement_time).all()
-        return render_template("movements.html", movements=movs, products=products, locations=locations)
+        db.session.commit()
+        flash('Sensor atualizado com sucesso!', 'success')
+        return redirect(url_for('list_sensors'))
 
-@app.route("/update-movement/<int:id>", methods=["POST", "GET"])
-def updateMovement(id):
+    return render_template('edit_sensor.html', sensor=sensor, devices=devices, sondas=sondas, empresas=empresas)
 
-    movement    = ProductMovement.query.get_or_404(id)
-    products    = Product.query.order_by(Product.date_created).all()
-    locations   = Location.query.order_by(Location.date_created).all()
 
-    if request.method == "POST":
-        movement.product_id  = request.form["productId"]
-        movement.qty         = request.form["qty"]
-        movement.from_location= request.form["fromLocation"]
-        movement.to_location  = request.form["toLocation"]
 
+# CADASTRO DE EMPRESA
+@app.route('/cadastro/empresa', methods=['GET', 'POST'])
+def cadastro_empresa():
+    if request.method == 'POST':
+        nome = request.form.get('nome')
+        cnpj = request.form.get('cnpj')
+        telefone = request.form.get('telefone')
+        email = request.form.get('email')
+        contato=request.form['contato']
+        endereco = request.form.get('endereco')
+        cidade = request.form.get('cidade')
+        estado = request.form.get('estado')
+        cep = request.form.get('cep')
+
+        if nome:
+            nova_empresa = Empresa(
+                nome=nome,
+                cnpj=cnpj,
+                telefone=telefone,
+                email=email,
+                contato=contato,
+                endereco=endereco,
+                cidade=cidade,
+                estado=estado,
+                cep=cep
+            )
+            try:
+                db.session.add(nova_empresa)
+                db.session.commit()
+                flash('Empresa cadastrada com sucesso!', 'success')
+            except Exception as e:
+                db.session.rollback()
+                flash(f'Erro ao cadastrar empresa. {str(e)}', 'danger')
+        return redirect('/cadastro/empresa')
+
+    empresas = Empresa.query.order_by(Empresa.nome).all()
+    return render_template('empresa.html', empresas=empresas)
+
+
+# EDITAR CADASTRO DE EMPRESA
+@app.route('/edit/empresa/<int:id>', methods=['POST'])
+def edit_empresa(id):
+    empresa = Empresa.query.get_or_404(id)
+    nome = request.form.get('nome')
+    cnpj = request.form.get('cnpj')
+    telefone = request.form.get('telefone')
+    email = request.form.get('email')  
+    contato = request.form.get('contato')  
+    endereco = request.form.get('endereco')
+    cidade = request.form.get('cidade')
+    estado = request.form.get('estado')
+    cep = request.form.get('cep')
+
+    if nome:
+        empresa.nome = nome
+        empresa.cnpj = cnpj
+        empresa.telefone = telefone
+        empresa.email = email
+        empresa.contato = contato
+        empresa.endereco = endereco
+        empresa.cidade = cidade
+        empresa.estado = estado
+        empresa.cep = cep
         try:
             db.session.commit()
-            return redirect("/movements/")
-
+            flash('Empresa editada com sucesso!', 'success')
         except:
-            return "There was an issue while updating the Product Movement"
-    else:
-        return render_template("update-movement.html", movement=movement, locations=locations, products=products)
+            db.session.rollback()
+            flash('Erro ao editar empresa.', 'danger')
+    return redirect('/cadastro/empresa')
 
-@app.route("/delete-movement/<int:id>")
-def deleteMovement(id):
-    movement_to_delete = ProductMovement.query.get_or_404(id)
 
+# DELETAR CADASTRO DE EMPRESA
+@app.route('/delete/empresa/<int:id>', methods=['POST'])
+def delete_empresa(id):
+    empresa = Empresa.query.get_or_404(id)
     try:
-        db.session.delete(movement_to_delete)
+        db.session.delete(empresa)
         db.session.commit()
-        return redirect("/movements/")
+        flash('Empresa excluída com sucesso!', 'success')
     except:
-        return "There was an issue while deleteing the Prodcut Movement"
-
-@app.route("/product-balance/", methods=["POST", "GET"])
-def productBalanceReport():
-    movs = ProductMovement.query.\
-        join(Product, ProductMovement.product_id == Product.product_id).\
-        add_columns(
-            Product.product_id, 
-            ProductMovement.qty,
-            ProductMovement.from_location,
-            ProductMovement.to_location,
-            ProductMovement.movement_time).\
-        order_by(ProductMovement.product_id).\
-        order_by(ProductMovement.movement_id).\
-        all()
-    balancedDict = defaultdict(lambda: defaultdict(dict))
-    tempProduct = ''
-    for mov in movs:
-        row = mov[0]
-        if(tempProduct == row.product_id):
-            if(row.to_location and not "qty" in balancedDict[row.product_id][row.to_location]):
-                balancedDict[row.product_id][row.to_location]["qty"] = 0
-            elif (row.from_location and not "qty" in balancedDict[row.product_id][row.from_location]):
-                balancedDict[row.product_id][row.from_location]["qty"] = 0
-            if (row.to_location and "qty" in balancedDict[row.product_id][row.to_location]):
-                balancedDict[row.product_id][row.to_location]["qty"] += row.qty
-            if (row.from_location and "qty" in balancedDict[row.product_id][row.from_location]):
-                balancedDict[row.product_id][row.from_location]["qty"] -= row.qty
-            pass
-        else :
-            tempProduct = row.product_id
-            if(row.to_location and not row.from_location):
-                if(balancedDict):
-                    balancedDict[row.product_id][row.to_location]["qty"] = row.qty
-                else:
-                    balancedDict[row.product_id][row.to_location]["qty"] = row.qty
-
-    return render_template("product-balance.html", movements=balancedDict)
-
-@app.route("/movements/get-from-locations/", methods=["POST"])
-def getLocations():
-    product = request.form["productId"]
-    location = request.form["location"]
-    locationDict = defaultdict(lambda: defaultdict(dict))
-    locations = ProductMovement.query.\
-        filter( ProductMovement.product_id == product).\
-        filter(ProductMovement.to_location != '').\
-        add_columns(ProductMovement.from_location, ProductMovement.to_location, ProductMovement.qty).\
-        all()
-
-    for key, location in enumerate(locations):
-        if(locationDict[location.to_location] and locationDict[location.to_location]["qty"]):
-            locationDict[location.to_location]["qty"] += location.qty
-        else:
-            locationDict[location.to_location]["qty"] = location.qty
-
-    return locationDict
+        db.session.rollback()
+        flash('Erro ao excluir empresa.', 'danger')
+    return redirect('/cadastro/empresa')
 
 
-@app.route("/dub-locations/", methods=["POST", "GET"])
-def getDublicate():
-    location = request.form["location"]
-    locations = Location.query.\
-        filter(Location.location_id == location).\
-        all()
-    print(locations)
-    if locations:
-        return {"output": False}
-    else:
-        return {"output": True}
+#CADASTRO DE TIPO DE SONDA
 
-@app.route("/dub-products/", methods=["POST", "GET"])
-def getPDublicate():
-    product_name = request.form["product_name"]
-    products = Product.query.\
-        filter(Product.product_id == product_name).\
-        all()
-    print(products)
-    if products:
-        return {"output": False}
-    else:
-        return {"output": True}
+@app.route('/cadastro/tipo-sonda', methods=['GET', 'POST'])
+def cadastro_tipo_sonda():
+    if request.method == 'POST':
+        nome = request.form.get('nome')
+        if nome:
+            nova_sonda = TipoSonda(nome=nome)
+            try:
+                db.session.add(nova_sonda)
+                db.session.commit()
+                flash('Tipo de Sonda cadastrado com sucesso!', 'success')
+            except:
+                db.session.rollback()
+                flash('Erro ao cadastrar tipo de sonda.', 'danger')
+        return redirect('/cadastro/tipo-sonda')
 
-def updateLocationInMovements(oldLocation, newLocation):
-    movement = ProductMovement.query.filter(ProductMovement.from_location == oldLocation).all()
-    movement2 = ProductMovement.query.filter(ProductMovement.to_location == oldLocation).all()
-    for mov in movement2:
-        mov.to_location = newLocation
-    for mov in movement:
-        mov.from_location = newLocation
-     
-    db.session.commit()
+    sondas = TipoSonda.query.order_by(TipoSonda.nome).all()
+    return render_template('tipo_sonda.html', sondas=sondas)
 
-def updateProductInMovements(oldProduct, newProduct):
-    movement = ProductMovement.query.filter(ProductMovement.product_id == oldProduct).all()
-    for mov in movement:
-        mov.product_id = newProduct
-    
-    db.session.commit()
+#EDITAR CADASTRO DE TIPO DE SONDA
+
+@app.route('/cadastro/tipo-sonda/<int:id>/editar', methods=['POST'])
+def edit_tipo_sonda(id):
+    sonda = TipoSonda.query.get_or_404(id)
+    novo_nome = request.form.get('nome')
+    if novo_nome:
+        try:
+            sonda.nome = novo_nome
+            db.session.commit()
+            flash('Tipo de Sonda atualizado com sucesso!', 'success')
+        except:
+            db.session.rollback()
+            flash('Erro ao atualizar tipo de sonda.', 'danger')
+    return redirect('/cadastro/tipo-sonda')
+
+#DELETAR CADASTRO DE TIPO DE SONDA
+
+@app.route('/cadastro/tipo-sonda/<int:id>/excluir', methods=['POST'])
+def delete_tipo_sonda(id):
+    sonda = TipoSonda.query.get_or_404(id)
+    try:
+        db.session.delete(sonda)
+        db.session.commit()
+        flash('Tipo de Sonda excluído com sucesso!', 'success')
+    except:
+        db.session.rollback()
+        flash('Erro ao excluir tipo de sonda.', 'danger')
+    return redirect('/cadastro/tipo-sonda')
+
+
+@app.route('/cadastro/tipo-device', methods=['GET', 'POST'])
+def cadastro_tipo_device():
+    if request.method == 'POST':
+        nome = request.form.get('nome')
+        if nome:
+            novo_device = TipoDevice(nome=nome)
+            try:
+                db.session.add(novo_device)
+                db.session.commit()
+                flash('Tipo de Device cadastrado com sucesso!', 'success')
+            except:
+                db.session.rollback()
+                flash('Erro ao cadastrar tipo de device.', 'danger')
+        return redirect('/cadastro/tipo-device')
+
+    devices = TipoDevice.query.order_by(TipoDevice.nome).all()
+    return render_template('tipo_device.html', devices=devices)
+
+
+@app.route('/edit/tipo-device/<int:id>', methods=['POST'])
+def edit_tipo_device(id):
+    nome = request.form.get('nome')
+    device = TipoDevice.query.get_or_404(id)
+    if nome:
+        device.nome = nome
+        try:
+            db.session.commit()
+            flash('Tipo de Device editado com sucesso!', 'success')
+        except:
+            db.session.rollback()
+            flash('Erro ao editar tipo de device.', 'danger')
+    return redirect('/cadastro/tipo-device')
+
+
+@app.route('/delete/tipo-device/<int:id>', methods=['POST'])
+def delete_tipo_device(id):
+    device = TipoDevice.query.get_or_404(id)
+    try:
+        db.session.delete(device)
+        db.session.commit()
+        flash('Tipo de Device excluído com sucesso!', 'success')
+    except:
+        db.session.rollback()
+        flash('Erro ao excluir tipo de device.', 'danger')
+    return redirect('/cadastro/tipo-device')
+
 
 if (__name__ == "__main__"):
+    with app.app_context():
+        db.create_all()
     app.run(debug=True)
+
+app.config['DEBUG'] = True
+app.config['PROPAGATE_EXCEPTIONS'] = True
+
+import csv
+from flask import Response
+
+@app.route('/exportar_empresas')
+def exportar_empresas():
+    empresas = Empresa.query.all()
+
+    def gerar_csv():
+        data = []
+        header = ['Nome', 'CNPJ', 'Telefone', 'Email', 'Contato', 'Endereço', 'Cidade', 'Estado', 'CEP']
+        data.append(header)
+        for e in empresas:
+            data.append([
+                e.nome or '',
+                e.cnpj or '',
+                e.telefone or '',
+                e.email or '',
+                e.contato or '',
+                e.endereco or '',
+                e.cidade or '',
+                e.estado or '',
+                e.cep or ''
+            ])
+        # Gera o conteúdo do CSV
+        si = csv.StringIO()
+        writer = csv.writer(si)
+        writer.writerows(data)
+        return si.getvalue()
+
+    return Response(
+        gerar_csv(),
+        mimetype='text/csv',
+        headers={'Content-Disposition': 'attachment;filename=empresas.csv'}
+    )
