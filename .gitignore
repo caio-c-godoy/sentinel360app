@@ -1,0 +1,12 @@
+# Python
+__pycache__/
+*.py[cod]
+*.log
+
+# Virtualenv
+venv/
+.env
+
+# SSH keys
+id_ed25519
+id_ed25519.pub
