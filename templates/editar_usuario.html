@@ -1,0 +1,41 @@
+{% extends 'base.html' %}
+{% block title %}<title>Editar Usuário</title>{% endblock %}
+
+{% block content %}
+<h2 class="mb-4">Editar Usuário</h2>
+
+<form method="POST">
+    <div class="mb-3">
+        <label for="nome" class="form-label">Nome</label>
+        <input type="text" class="form-control" id="nome" name="nome" value="{{ usuario.nome }}" required>
+    </div>
+    <div class="mb-3">
+        <label for="email" class="form-label">E-mail</label>
+        <input type="email" class="form-control" id="email" name="email" value="{{ usuario.email }}" required>
+    </div>
+
+    <div class="form-check mb-2">
+        <input class="form-check-input" type="checkbox" name="can_view" id="can_view" {% if usuario.can_view %}checked{% endif %}>
+        <label class="form-check-label" for="can_view">Pode visualizar</label>
+    </div>
+    <div class="form-check mb-2">
+        <input class="form-check-input" type="checkbox" name="can_edit" id="can_edit" {% if usuario.can_edit %}checked{% endif %}>
+        <label class="form-check-label" for="can_edit">Pode editar</label>
+    </div>
+    <div class="form-check mb-2">
+        <input class="form-check-input" type="checkbox" name="can_delete" id="can_delete" {% if usuario.can_delete %}checked{% endif %}>
+        <label class="form-check-label" for="can_delete">Pode excluir</label>
+    </div>
+    <div class="form-check mb-2">
+        <input class="form-check-input" type="checkbox" name="can_export" id="can_export" {% if usuario.can_export %}checked{% endif %}>
+        <label class="form-check-label" for="can_export">Pode exportar</label>
+    </div>
+    <div class="form-check mb-4">
+        <input class="form-check-input" type="checkbox" name="is_admin" id="is_admin" {% if usuario.is_admin %}checked{% endif %}>
+        <label class="form-check-label" for="is_admin">Administrador</label>
+    </div>
+
+    <button type="submit" class="btn btn-primary">Salvar Alterações</button>
+    <a href="{{ url_for('usuarios') }}" class="btn btn-secondary">Cancelar</a>
+</form>
+{% endblock %}

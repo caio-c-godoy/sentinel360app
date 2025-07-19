@@ -1,0 +1,62 @@
+{% extends 'base.html' %}
+
+{% block title %}
+<title>Usuários</title>
+{% endblock %}
+
+{% block content %}
+<h1 class="mb-4">Usuários Cadastrados</h1>
+
+<!-- Botão para novo usuário -->
+<a href="{{ url_for('criar_usuario') }}" class="btn btn-primary mb-3">
+    <i class="fas fa-user-plus"></i> Novo Usuário
+</a>
+
+<div class="table-responsive">
+    <table id="usuariosTable" class="table table-bordered table-hover">
+        <thead class="table-light">
+            <tr>
+                <th>Nome</th>
+                <th>E-mail</th>
+                <th>Visualizar</th>
+                <th>Editar</th>
+                <th>Excluir</th>
+                <th>Exportar</th>
+                <th>Admin</th> <!-- CORRIGIDO: reposicionado -->
+                <th>Ações</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for usuario in usuarios %}
+            <tr>
+                <td>{{ usuario.nome }}</td>
+                <td>{{ usuario.email }}</td>
+                <td>{% if usuario.can_view %}<i class="fas fa-check text-success"></i>{% else %}<i class="fas fa-times text-danger"></i>{% endif %}</td>
+                <td>{% if usuario.can_edit %}<i class="fas fa-check text-success"></i>{% else %}<i class="fas fa-times text-danger"></i>{% endif %}</td>
+                <td>{% if usuario.can_delete %}<i class="fas fa-check text-success"></i>{% else %}<i class="fas fa-times text-danger"></i>{% endif %}</td>
+                <td>{% if usuario.can_export %}<i class="fas fa-check text-success"></i>{% else %}<i class="fas fa-times text-danger"></i>{% endif %}</td>
+                <td>{% if usuario.is_admin %}<i class="fas fa-check text-success"></i>{% else %}<i class="fas fa-times text-danger"></i>{% endif %}</td>
+                <td>
+                    <a href="{{ url_for('editar_usuario', user_id=usuario.id) }}" class="btn btn-sm btn-outline-primary" title="Editar">
+                        <i class="fas fa-edit"></i>
+                    </a>
+                    <a href="{{ url_for('deletar_usuario', user_id=usuario.id) }}" class="btn btn-sm btn-outline-danger" title="Excluir" onclick="return confirm('Deseja realmente excluir este usuário?');">
+                        <i class="fas fa-trash"></i>
+                    </a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<script>
+    $(document).ready(function () {
+        $('#usuariosTable').DataTable({
+            language: {
+                url: "//cdn.datatables.net/plug-ins/1.10.20/i18n/Portuguese-Brasil.json"
+            }
+        });
+    });
+</script>
+{% endblock %}

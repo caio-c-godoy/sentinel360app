@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-5">
+    <h2>Redefinir Senha</h2>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }}">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <form method="POST">
+        <div class="mb-3">
+            <label for="senha_temporaria" class="form-label">Senha Temporária:</label>
+            <input type="password" class="form-control" id="senha_temporaria" name="senha_temporaria" required>
+        </div>
+        <div class="mb-3">
+            <label for="senha" class="form-label">Nova Senha:</label>
+            <input type="password" class="form-control" id="senha" name="senha" required>
+        </div>
+        <div class="mb-3">
+            <label for="confirmar_senha" class="form-label">Confirmar Nova Senha:</label>
+            <input type="password" class="form-control" id="confirmar_senha" name="confirmar_senha" required>
+        </div>
+        <button type="submit" class="btn btn-primary">Redefinir</button>
+    </form>
+</div>
+{% endblock %}

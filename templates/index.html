@@ -5,6 +5,35 @@
 {% endblock %}
 
 {% block content %}
+
+<style>
+  .pulse {
+    animation: pulse 1.5s infinite;
+  }
+
+  @keyframes pulse {
+    0%   { transform: scale(1);   opacity: 1; }
+    50%  { transform: scale(1.2); opacity: 0.7; }
+    100% { transform: scale(1);   opacity: 1; }
+  }
+</style>
+
+{% if sensores_a_calibrar %}
+  <div style="position: fixed; top: 10px; right: 20px; z-index: 9999;">
+    <a href="{{ url_for('exportar_calib_dashboard') }}"
+       class="btn btn-danger pulse" 
+       title="Clique para exportar sensores com calibração prevista nos próximos 60 dias"
+       style="position: relative;">
+      <i class="fas fa-bell"></i>
+      <span class="badge bg-light text-dark rounded-pill" 
+            style="position:absolute; top:-8px; right:-8px; font-size: 0.75rem;">
+        {{ sensores_a_calibrar|length }}
+      </span>
+    </a>
+  </div>
+{% endif %}
+
+
 <main>
     <div class="container-fluid">
         <h1 class="mt-4">Dashboard</h1>
@@ -40,13 +69,17 @@
     </div>
 </main>
 
+
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
+
 <script>
     const deviceData = {{ sensores_por_device | tojson }};
     const tipoSondaData = {{ sensores_por_tipo_sonda | tojson }};
     const statusData = {{ sensores_por_status | tojson }};
-
+    const estadoData = {{ sensores_por_estado | tojson }};  // NOVO
+ 
+    // Chart Device (3D estilo simulado com border e sombra)
     new Chart(document.getElementById('chartDevice'), {
         type: 'bar',
         data: {
@@ -56,18 +89,18 @@
                 data: deviceData.map(item => item[1]),
                 backgroundColor: 'rgba(54, 162, 235, 0.7)',
                 borderColor: 'rgba(54, 162, 235, 1)',
-                borderWidth: 1
+                borderWidth: 1,
+                borderRadius: 6
             }]
         },
         options: {
+            layout: { padding: 10 },
             scales: {
                 y: {
                     beginAtZero: true,
                     max: 100,
                     ticks: {
-                        callback: function(value) {
-                            return value + '%';
-                        }
+                        callback: value => value + '%'
                     }
                 }
             },
@@ -76,30 +109,27 @@
                     color: '#000',
                     anchor: 'end',
                     align: 'top',
-                    formatter: function(value, context) {
+                    formatter: (value, context) => {
                         const qtd = deviceData[context.dataIndex][2];
                         return `${qtd} (${value}%)`;
                     },
-                    font: {
-                        weight: 'bold'
-                    }
+                    font: { weight: 'bold' }
                 },
                 tooltip: {
                     callbacks: {
-                        label: function(context) {
+                        label: (context) => {
                             const qtd = deviceData[context.dataIndex][2];
                             return `Qtd: ${qtd} — ${context.parsed.y}%`;
                         }
                     }
                 },
-                legend: {
-                    display: false
-                }
+                legend: { display: false }
             }
         },
         plugins: [ChartDataLabels]
     });
 
+    // Chart Tipo de Sonda
     new Chart(document.getElementById('chartTipoSonda'), {
         type: 'bar',
         data: {
@@ -107,18 +137,53 @@
             datasets: [{
                 label: 'Quantidade',
                 data: tipoSondaData.map(item => item[1]),
-                backgroundColor: 'rgba(255, 159, 64, 0.7)'
+                backgroundColor: 'rgba(255, 159, 64, 0.7)',
+                borderRadius: 6
             }]
         }
     });
 
+    // Chart Status (corrigido)
     new Chart(document.getElementById('chartStatus'), {
-        type: 'pie',
+        type: 'doughnut', // visualmente mais 3D
         data: {
             labels: statusData.map(item => item[0]),
             datasets: [{
                 data: statusData.map(item => item[1]),
                 backgroundColor: ['#88DBDF', '#FF9CAF', '#F9E79F']
+            }]
+        },
+        options: {
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                }
+            }
+        }
+    });
+
+    // Chart Estado (UF) — NOVO
+    const estadoCanvas = document.createElement('canvas');
+    estadoCanvas.id = 'chartEstado';
+    document.querySelector('.container-fluid .row').insertAdjacentHTML('beforeend', `
+        <div class="col-md-4">
+            <div class="card mb-4">
+                <div class="card-header">Sensores por Estado (UF)</div>
+                <div class="card-body"></div>
+            </div>
+        </div>
+    `);
+    document.querySelector('.card-body:last-child').appendChild(estadoCanvas);
+
+    new Chart(estadoCanvas, {
+        type: 'bar',
+        data: {
+            labels: estadoData.map(item => item[0]),
+            datasets: [{
+                label: 'Sensores',
+                data: estadoData.map(item => item[1]),
+                backgroundColor: 'rgba(153, 102, 255, 0.6)',
+                borderRadius: 6
             }]
         }
     });

@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-5">
+  <h3>Redefinir Senha</h3>
+  <form method="POST" action="{{ url_for('redefinir_senha') }}">
+    <div class="mb-3">
+      <label>Email</label>
+      <input type="email" name="email" class="form-control" required>
+    </div>
+    <button type="submit" class="btn btn-warning">Enviar link de redefinição</button>
+  </form>
+</div>
+{% endblock %}
