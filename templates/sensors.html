@@ -23,17 +23,6 @@
 {% block content %}
 <div class="container-fluid px-3 py-4">
     <h2 class="mb-4">Cadastrar Sensor</h2>
-
-    {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-            {% for category, message in messages %}
-                <div class="alert alert-{{ 'danger' if category == 'danger' else 'success' }}">
-                    {{ message }}
-                </div>
-            {% endfor %}
-        {% endif %}
-    {% endwith %}
-
     <div class="card p-3 mb-4">
         <form method="POST">
             <div class="row mb-3">

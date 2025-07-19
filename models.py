@@ -219,6 +219,7 @@ class User(db.Model, UserMixin):  # <- HERDA DE UserMixin
     can_export = db.Column(db.Boolean, default=False)
     is_admin = db.Column(db.Boolean, default=False)
     trocar_senha = db.Column(db.Boolean, default=False)
+    dashboard_order = db.Column(db.Text, nullable=True)
 
     def set_password(self, senha):
         self.senha_hash = generate_password_hash(senha)
@@ -242,5 +243,3 @@ class User(db.Model, UserMixin):  # <- HERDA DE UserMixin
         except Exception:
             return None
         return User.query.get(user_id)
-
-

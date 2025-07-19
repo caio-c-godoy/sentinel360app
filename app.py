@@ -16,6 +16,7 @@ import string
 from flask_mail import Message
 from utils import enviar_email_boas_vindas
 from utils import enviar_email_recuperacao
+import json
 
 
 # Imports do Flask
@@ -378,14 +379,31 @@ def index():
     )
     sensores_por_estado = [(estado, count) for estado, count in sensores_por_estado_query]
 
+    # --- Ordem do Dashboard ---
+    dashboard_order = json.loads(current_user.dashboard_order or "[]")
+
     return render_template(
         "index.html",
         sensores_por_device=sensores_por_device_pct,
         sensores_por_tipo_sonda=sensores_por_tipo_sonda,
         sensores_por_status=sensores_por_status,
         sensores_por_estado=sensores_por_estado,
-        sensores_a_calibrar=sensores_a_calibrar
+        sensores_a_calibrar=sensores_a_calibrar,
+        dashboard_order=dashboard_order
     )
+
+
+#-----salvar conf dashboard usuario
+@app.route('/salvar_ordem_dashboard', methods=['POST'])
+@login_required
+def salvar_ordem_dashboard():
+    data = request.get_json()
+    ordem = data.get('ordem')
+    if ordem:
+        current_user.dashboard_order = json.dumps(ordem)
+        db.session.commit()
+        return jsonify({'status': 'ok'}), 200
+    return jsonify({'error': 'invalid data'}), 400
 
 
 

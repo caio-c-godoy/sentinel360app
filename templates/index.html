@@ -6,15 +6,37 @@
 
 {% block content %}
 
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gridstack@9.2.1/dist/gridstack.min.css" />
+
 <style>
+  body {
+    padding-top: 0 !important;
+  }
+  main .container-fluid {
+    margin-top: -20px !important;
+  }
+  h1.mt-4 {
+    margin-top: 0 !important;
+    font-size: 1.6rem;
+  }
+  .breadcrumb.mb-4 {
+    margin-bottom: 12px !important;
+    padding: 4px 12px;
+  }
+  .grid-stack-item-content {
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 0 8px rgba(0, 0, 0, 0.1);
+    padding: 12px;
+    height: 100%;
+  }
   .pulse {
     animation: pulse 1.5s infinite;
   }
-
   @keyframes pulse {
-    0%   { transform: scale(1);   opacity: 1; }
-    50%  { transform: scale(1.2); opacity: 0.7; }
-    100% { transform: scale(1);   opacity: 1; }
+    0% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.2); opacity: 0.7; }
+    100% { transform: scale(1); opacity: 1; }
   }
 </style>
 
@@ -33,159 +55,180 @@
   </div>
 {% endif %}
 
+<main class="container-fluid mt-4">
+  <h1>Dashboard</h1>
+  <ol class="breadcrumb mb-4">
+    <li class="breadcrumb-item active">Resumo de Sensores</li>
+  </ol>
 
-<main>
-    <div class="container-fluid">
-        <h1 class="mt-4">Dashboard</h1>
-        <ol class="breadcrumb mb-4">
-            <li class="breadcrumb-item active">Resumo de Sensores</li>
-        </ol>
-        <div class="row">
-            <div class="col-md-4">
-                <div class="card mb-4">
-                    <div class="card-header">Sensores por Tipo de Device (%)</div>
-                    <div class="card-body">
-                        <canvas id="chartDevice"></canvas>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="card mb-4">
-                    <div class="card-header">Sensores por Tipo de Sonda</div>
-                    <div class="card-body">
-                        <canvas id="chartTipoSonda"></canvas>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="card mb-4">
-                    <div class="card-header">Sensores por Status</div>
-                    <div class="card-body">
-                        <canvas id="chartStatus"></canvas>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
+  <div class="grid-stack"></div>
 </main>
-
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/gridstack@9.2.1/dist/gridstack-all.js"></script>
 
 <script>
-    const deviceData = {{ sensores_por_device | tojson }};
-    const tipoSondaData = {{ sensores_por_tipo_sonda | tojson }};
-    const statusData = {{ sensores_por_status | tojson }};
-    const estadoData = {{ sensores_por_estado | tojson }};  // NOVO
- 
-    // Chart Device (3D estilo simulado com border e sombra)
+  const deviceData = {{ sensores_por_device | tojson }};
+  const tipoSondaData = {{ sensores_por_tipo_sonda | tojson }};
+  const statusData = {{ sensores_por_status | tojson }};
+  const estadoData = {{ sensores_por_estado | tojson }};
+  let savedLayout = {{ dashboard_order | tojson | safe }} || [];
+
+  if (!savedLayout.length) {
+    savedLayout = [
+      { id: 'chartDevice', title: 'Sensores por Tipo de Device (%)', w: 4, h: 2 },
+      { id: 'chartTipoSonda', title: 'Sensores por Tipo de Sonda', w: 4, h: 2 },
+      { id: 'chartStatus', title: 'Sensores por Status', w: 4, h: 2 },
+      { id: 'chartUF', title: 'Sensores por Estado (UF)', w: 4, h: 2 }
+    ];
+  }
+
+  const grid = GridStack.init({
+    cellHeight: 200,
+    float: true,
+    resizable: true,
+    draggable: { handle: '.grid-stack-item-content' }
+  });
+
+  function renderCharts() {
     new Chart(document.getElementById('chartDevice'), {
-        type: 'bar',
-        data: {
-            labels: deviceData.map(item => item[0]),
-            datasets: [{
-                label: 'Porcentagem (%)',
-                data: deviceData.map(item => item[1]),
-                backgroundColor: 'rgba(54, 162, 235, 0.7)',
-                borderColor: 'rgba(54, 162, 235, 1)',
-                borderWidth: 1,
-                borderRadius: 6
-            }]
+      type: 'bar',
+      data: {
+        labels: deviceData.map(item => item[0]),
+        datasets: [{
+          label: 'Porcentagem (%)',
+          data: deviceData.map(item => item[1]),
+          backgroundColor: 'rgba(54, 162, 235, 0.7)',
+          borderColor: 'rgba(54, 162, 235, 1)',
+          borderWidth: 1,
+          borderRadius: 6
+        }]
+      },
+      options: {
+        layout: { padding: 10 },
+        scales: {
+          y: {
+            beginAtZero: true,
+            max: 100,
+            ticks: {
+              callback: value => value + '%'
+            }
+          }
         },
-        options: {
-            layout: { padding: 10 },
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    max: 100,
-                    ticks: {
-                        callback: value => value + '%'
-                    }
-                }
+        plugins: {
+          datalabels: {
+            color: '#000',
+            anchor: 'end',
+            align: 'top',
+            formatter: (value, context) => {
+              const qtd = deviceData[context.dataIndex][2];
+              return `${qtd} (${value}%)`;
             },
-            plugins: {
-                datalabels: {
-                    color: '#000',
-                    anchor: 'end',
-                    align: 'top',
-                    formatter: (value, context) => {
-                        const qtd = deviceData[context.dataIndex][2];
-                        return `${qtd} (${value}%)`;
-                    },
-                    font: { weight: 'bold' }
-                },
-                tooltip: {
-                    callbacks: {
-                        label: (context) => {
-                            const qtd = deviceData[context.dataIndex][2];
-                            return `Qtd: ${qtd} — ${context.parsed.y}%`;
-                        }
-                    }
-                },
-                legend: { display: false }
+            font: { weight: 'bold' }
+          },
+          tooltip: {
+            callbacks: {
+              label: (context) => {
+                const qtd = deviceData[context.dataIndex][2];
+                return `Qtd: ${qtd} — ${context.parsed.y}%`;
+              }
             }
-        },
-        plugins: [ChartDataLabels]
+          },
+          legend: { display: false }
+        }
+      },
+      plugins: [ChartDataLabels]
     });
 
-    // Chart Tipo de Sonda
     new Chart(document.getElementById('chartTipoSonda'), {
-        type: 'bar',
-        data: {
-            labels: tipoSondaData.map(item => item[0]),
-            datasets: [{
-                label: 'Quantidade',
-                data: tipoSondaData.map(item => item[1]),
-                backgroundColor: 'rgba(255, 159, 64, 0.7)',
-                borderRadius: 6
-            }]
-        }
+      type: 'bar',
+      data: {
+        labels: tipoSondaData.map(item => item[0]),
+        datasets: [{
+          label: 'Quantidade',
+          data: tipoSondaData.map(item => item[1]),
+          backgroundColor: 'rgba(255, 159, 64, 0.7)',
+          borderRadius: 6
+        }]
+      }
     });
 
-    // Chart Status (corrigido)
     new Chart(document.getElementById('chartStatus'), {
-        type: 'doughnut', // visualmente mais 3D
-        data: {
-            labels: statusData.map(item => item[0]),
-            datasets: [{
-                data: statusData.map(item => item[1]),
-                backgroundColor: ['#88DBDF', '#FF9CAF', '#F9E79F']
-            }]
-        },
-        options: {
-            plugins: {
-                legend: {
-                    position: 'bottom'
-                }
-            }
+      type: 'doughnut',
+      data: {
+        labels: statusData.map(item => item[0]),
+        datasets: [{
+          data: statusData.map(item => item[1]),
+          backgroundColor: ['#88DBDF', '#FF9CAF', '#F9E79F']
+        }]
+      },
+      options: {
+        plugins: {
+          legend: { position: 'bottom' }
         }
+      }
     });
 
-    // Chart Estado (UF) — NOVO
-    const estadoCanvas = document.createElement('canvas');
-    estadoCanvas.id = 'chartEstado';
-    document.querySelector('.container-fluid .row').insertAdjacentHTML('beforeend', `
-        <div class="col-md-4">
-            <div class="card mb-4">
-                <div class="card-header">Sensores por Estado (UF)</div>
-                <div class="card-body"></div>
-            </div>
-        </div>
-    `);
-    document.querySelector('.card-body:last-child').appendChild(estadoCanvas);
-
-    new Chart(estadoCanvas, {
-        type: 'bar',
-        data: {
-            labels: estadoData.map(item => item[0]),
-            datasets: [{
-                label: 'Sensores',
-                data: estadoData.map(item => item[1]),
-                backgroundColor: 'rgba(153, 102, 255, 0.6)',
-                borderRadius: 6
-            }]
-        }
+    new Chart(document.getElementById('chartUF'), {
+      type: 'bar',
+      data: {
+        labels: estadoData.map(item => item[0]),
+        datasets: [{
+          label: 'Sensores',
+          data: estadoData.map(item => item[1]),
+          backgroundColor: 'rgba(153, 102, 255, 0.6)',
+          borderRadius: 6
+        }]
+      }
     });
+  }
+
+  // Render layout + charts
+  savedLayout.forEach(chart => {
+    const el = document.createElement('div');
+    el.classList.add('grid-stack-item');
+    el.setAttribute('gs-w', chart.w);
+    el.setAttribute('gs-h', chart.h);
+    if (chart.x !== undefined && chart.y !== undefined) {
+      el.setAttribute('gs-x', chart.x);
+      el.setAttribute('gs-y', chart.y);
+    }
+    el.innerHTML = `
+      <div class="grid-stack-item-content">
+        <h6>${chart.title}</h6>
+        <canvas id="${chart.id}"></canvas>
+      </div>`;
+    grid.addWidget(el);
+  });
+
+  // Render charts after grid items are added
+  setTimeout(renderCharts, 0);
+
+  grid.on('change', function (event, items) {
+    const layoutToSave = grid.engine.nodes.map(node => {
+      return {
+        id: node.el.querySelector('canvas').id,
+        title: node.el.querySelector('h6').innerText,
+        w: node.w,
+        h: node.h,
+        x: node.x,
+        y: node.y
+      };
+    });
+
+    fetch("/salvar_ordem_dashboard", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ ordem: layoutToSave })
+    }).then(response => {
+      if (!response.ok) {
+        console.error("Erro ao salvar layout do dashboard");
+      }
+    });
+  });
 </script>
+
 {% endblock %}
