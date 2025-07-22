@@ -1,1 +1,3 @@
-gunicorn -w 4 -b 0.0.0.0:$8000 app:app
+#!/bin/sh
+cd /home/site/wwwroot
+gunicorn --bind=0.0.0.0 --timeout 600 app:app
