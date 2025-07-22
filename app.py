@@ -1,42 +1,64 @@
-# Imports padrão da biblioteca do Python
-from flask_login import LoginManager, login_user, login_required, logout_user, current_user
-import uuid
 import os
 import io
 import csv
+import uuid
+import json
+import string
+import secrets
 from io import StringIO
 from datetime import datetime, timedelta, date
 from pathlib import Path
-from extensions import mail
-from flask_mail import Message
-from werkzeug.security import generate_password_hash
-from models import User as Usuario
-import secrets
-import string
-from flask_mail import Message
-from utils import enviar_email_boas_vindas
-from utils import enviar_email_recuperacao
-import json
 
-
-# Imports do Flask
+# Flask
 from flask import Flask, render_template, url_for, request, redirect, flash, jsonify, make_response, session, Response, send_file
 from werkzeug.utils import secure_filename
+from werkzeug.security import generate_password_hash
 
-# Extensões Flask e SQLAlchemy
+# Extensões Flask
+from flask_sqlalchemy import SQLAlchemy
+from flask_login import LoginManager, login_user, login_required, logout_user, current_user
+from flask_mail import Mail, Message
 from flask_migrate import Migrate
 from sqlalchemy import func
+from dotenv import load_dotenv
 
-# ── importa só o objeto 'db' (ainda sem app associada) ──────────────
-from models import db, User
+# Utilitários do sistema
+from extensions import mail
+from models import db, User, Empresa, TipoDevice, TipoSonda, Sensor, Parceiro, Estado, Municipio
+from utils import enviar_email_boas_vindas, enviar_email_recuperacao
 
+# Carregar variáveis de ambiente
+load_dotenv()
+
+# Inicializa o app
 app = Flask(__name__)
+app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DATABASE_URL")
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+app.config["DEBUG"] = True
+app.config["PROPAGATE_EXCEPTIONS"] = True
+app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", secrets.token_hex(16))
+
+# Email
+app.config["MAIL_SERVER"] = os.getenv("MAIL_SERVER", "smtp.office365.com")
+app.config["MAIL_PORT"] = int(os.getenv("MAIL_PORT", 587))
+app.config["MAIL_USERNAME"] = os.getenv("MAIL_USERNAME")
+app.config["MAIL_PASSWORD"] = os.getenv("MAIL_PASSWORD")
+app.config["MAIL_USE_TLS"] = True
+app.config["MAIL_USE_SSL"] = False
+
+# Inicializa extensões
+db.init_app(app)
+migrate = Migrate(app, db)
+mail.init_app(app)
+
+# Login Manager
 login_manager = LoginManager()
 login_manager.login_view = 'login'
 login_manager.init_app(app)
 
-import secrets
-app.secret_key = secrets.token_hex(16)  # mais seguro para produção
+@app.route('/')
+def index():
+    return "Sentinel360 está rodando com sucesso no Azure!"
 
 
 @login_manager.user_loader
