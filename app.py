@@ -32,19 +32,44 @@ load_dotenv()
 
 # Inicializa o app
 app = Flask(__name__)
-app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DATABASE_URL")
+app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("DATABASE_URL")
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config["DEBUG"] = True
 app.config["PROPAGATE_EXCEPTIONS"] = True
-app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", secrets.token_hex(16))
+app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", secrets.token_hex(16))
+
+# Logging para Azure
+import logging
+import sys
+logger = logging.getLogger()
+logger.setLevel(logging.DEBUG)
+handler = logging.StreamHandler(sys.stdout)
+handler.setLevel(logging.DEBUG)
+formatter = logging.Formatter("[%(asctime)s] [%(levelname)s] %(message)s")
+handler.setFormatter(formatter)
+logger.addHandler(handler)
+app.logger.addHandler(handler)
 
 # Email
 app.config["MAIL_SERVER"] = os.getenv("MAIL_SERVER", "smtp.office365.com")
 app.config["MAIL_PORT"] = int(os.getenv("MAIL_PORT", 587))
-app.config["MAIL_USERNAME"] = os.getenv("MAIL_USERNAME")
-app.config["MAIL_PASSWORD"] = os.getenv("MAIL_PASSWORD")
+app.config["MAIL_USERNAME"] = os.environ.get("MAIL_USERNAME")
+app.config["MAIL_PASSWORD"] = os.environ.get("MAIL_PASSWORD")
 app.config["MAIL_USE_TLS"] = True
 app.config["MAIL_USE_SSL"] = False
+
+# Teste de conexão com banco
+try:
+    app.logger.info("🔍 Testando conexão com o banco de dados PostgreSQL...")
+    import psycopg2
+    conn = psycopg2.connect(os.environ.get("DATABASE_URL").replace("+psycopg2", ""))
+    conn.close()
+    app.logger.info("✅ Conexão direta com PostgreSQL bem-sucedida.")
+except Exception as e:
+    app.logger.error(f"❌ Erro ao conectar diretamente com PostgreSQL: {e}")
+
+app.logger.info(f"🔁 DATABASE_URL atual: {os.environ.get('DATABASE_URL')}")
+
 
 # Inicializa extensões
 db.init_app(app)
@@ -1341,6 +1366,15 @@ def delete_parceiro(id):
         flash("Parceiro não encontrado.", "danger")
 
     return redirect(url_for("parceiros"))
+
+#add novo
+import logging
+
+if not app.debug:
+    app.logger.setLevel(logging.INFO)
+
+app.logger.info("🚀 Sentinel360 foi iniciado.")
+
 
 if (__name__ == "__main__"):
     with app.app_context():
