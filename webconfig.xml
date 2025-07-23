@@ -1,23 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
 <configuration>
   <system.webServer>
     <handlers>
-      <add name="PythonHandler" path="*" verb="*" modules="FastCgiModule" scriptProcessor="D:\home\Python364x64\python.exe|D:\home\site\wwwroot\ptvs_virtualenv_proxy.py" resourceType="Unspecified" requireAccess="Script" />
+      <add name="python" path="*" verb="*" modules="FastCgiModule" scriptProcessor="D:\home\Python311\python.exe|D:\home\site\wwwroot\startup.sh" resourceType="Unspecified" requireAccess="Script" />
     </handlers>
-    <rewrite>
-      <rules>
-        <rule name="StaticFiles" stopProcessing="true">
-          <conditions>
-            <add input="true" pattern="false" />
-          </conditions>
-          <action type="Rewrite" url="public{REQUEST_URI}" />
-        </rule>
-        <rule name="DynamicContent" stopProcessing="true">
-          <conditions>
-            <add input="true" pattern="true" />
-          </conditions>
-          <action type="Rewrite" url="app.py" />
-        </rule>
-      </rules>
-    </rewrite>
+    <defaultDocument>
+      <files>
+        <clear />
+        <add value="startup.sh" />
+      </files>
+    </defaultDocument>
   </system.webServer>
 </configuration>
