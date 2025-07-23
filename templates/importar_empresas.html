@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+    <h3>Importar Empresas</h3>
+    <form method="POST" enctype="multipart/form-data">
+        <div class="mb-3">
+            <label class="form-label">Arquivo CSV</label>
+            <input type="file" name="arquivo_csv" accept=".csv" class="form-control" required>
+        </div>
+        <button type="submit" class="btn btn-primary">Importar</button>
+        <a href="{{ url_for('cadastro_empresa') }}" class="btn btn-secondary">Voltar</a>
+    </form>
+</div>
+{% endblock %}

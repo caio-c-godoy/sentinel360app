@@ -53,7 +53,29 @@
     <hr>
 
     <h3 class="mt-4">Empresas Cadastradas</h3>
-    <a href="{{ url_for('exportar_empresas') }}" class="btn btn-success mb-3">Exportar Empresas</a>
+   <div class="d-flex align-items-center gap-2 mb-3">
+    <!-- Botão Importar -->
+    <button class="btn btn-outline-success"
+            data-bs-toggle="modal"
+            data-bs-target="#importModal"
+            title="Importar empresas via CSV">
+        <i class="fas fa-file-upload"></i>
+    </button>
+
+    <!-- Botão Exportar -->
+    <a href="{{ url_for('exportar_empresas') }}"
+       class="btn btn-outline-primary"
+       title="Exportar empresas para CSV">
+        <i class="fas fa-file-download"></i>
+    </a>
+
+    <!-- Baixar modelo -->
+    <a href="{{ url_for('static', filename='modelo_empresas.csv') }}"
+       class="btn btn-outline-warning"
+       title="Baixar modelo de planilha CSV">
+        <i class="fas fa-file-csv"></i>
+    </a>
+</div>
 
     <ul class="list-group">
         {% for empresa in empresas %}
@@ -119,6 +141,55 @@
         {% endfor %}
     </ul>
 </div>
+<div class="d-flex justify-content-center mt-4">
+    <nav>
+        <ul class="pagination">
+            {% if pagination.has_prev %}
+            <li class="page-item">
+                <a class="page-link" href="{{ url_for('cadastro_empresa', page=pagination.prev_num) }}">Anterior</a>
+            </li>
+            {% else %}
+            <li class="page-item disabled"><span class="page-link">Anterior</span></li>
+            {% endif %}
+
+            <li class="page-item disabled">
+                <span class="page-link">Página {{ pagination.page }} de {{ pagination.pages }}</span>
+            </li>
+
+            {% if pagination.has_next %}
+            <li class="page-item">
+                <a class="page-link" href="{{ url_for('cadastro_empresa', page=pagination.next_num) }}">Próxima</a>
+            </li>
+            {% else %}
+            <li class="page-item disabled"><span class="page-link">Próxima</span></li>
+            {% endif %}
+        </ul>
+    </nav>
+</div>
+
+<!-- Modal de Importação -->
+<div class="modal fade" id="importModal" tabindex="-1" aria-labelledby="importModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <form class="modal-content" action="{{ url_for('importar_empresas') }}" method="POST" enctype="multipart/form-data">
+      <div class="modal-header">
+        <h5 class="modal-title" id="importModalLabel">Importar Empresas</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label for="arquivo_csv" class="form-label">Selecione o arquivo CSV:</label>
+          <input type="file" name="arquivo_csv" id="arquivo_csv" class="form-control" accept=".csv" required>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="submit" class="btn btn-primary">Importar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+
 </main>
 
 <script>
@@ -156,4 +227,19 @@
         form.classList.toggle('d-none');
     }
 </script>
+
+<script>
+    function carregarPagina(pagina) {
+        fetch(`/empresas/pagina/${pagina}`)
+            .then(response => response.text())
+            .then(data => {
+                document.getElementById("tabela-empresas").innerHTML = data;
+            })
+            .catch(error => {
+                alert("Erro ao carregar página: " + error);
+            });
+    }
+</script>
+
+
 {% endblock %}

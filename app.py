@@ -1,89 +1,54 @@
+# Imports padrão
 import os
+import uuid
 import io
 import csv
-import uuid
 import json
 import string
 import secrets
-from io import StringIO
+from io import StringIO, TextIOWrapper
 from datetime import datetime, timedelta, date
 from pathlib import Path
 
-# Flask
-from flask import Flask, render_template, url_for, request, redirect, flash, jsonify, make_response, session, Response, send_file
+# Carrega variáveis do .env
+from dotenv import load_dotenv
+load_dotenv()
+
+# Imports do Flask
+from flask import (
+    Flask, render_template, url_for, request, redirect, flash, jsonify,
+    make_response, session, Response, send_file
+)
+from flask_login import LoginManager, login_user, login_required, logout_user, current_user
+from flask_mail import Message
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash
 
-# Extensões Flask
-from flask_sqlalchemy import SQLAlchemy
-from flask_login import LoginManager, login_user, login_required, logout_user, current_user
-from flask_mail import Mail, Message
+# Extensões e banco de dados
 from flask_migrate import Migrate
 from sqlalchemy import func
-from dotenv import load_dotenv
-
-# Utilitários do sistema
 from extensions import mail
-from models import db, User, Empresa, TipoDevice, TipoSonda, Sensor, Parceiro, Estado, Municipio
+from models import db, User, Sensor, Empresa
 from utils import enviar_email_boas_vindas, enviar_email_recuperacao
 
-# Carregar variáveis de ambiente
-load_dotenv()
-
-# Inicializa o app
+# ─────────────── INICIALIZAÇÃO ───────────────
 app = Flask(__name__)
-app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("DATABASE_URL")
-app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-app.config["DEBUG"] = True
-app.config["PROPAGATE_EXCEPTIONS"] = True
-app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", secrets.token_hex(16))
 
-# Logging para Azure
-import logging
-import sys
-logger = logging.getLogger()
-logger.setLevel(logging.DEBUG)
-handler = logging.StreamHandler(sys.stdout)
-handler.setLevel(logging.DEBUG)
-formatter = logging.Formatter("[%(asctime)s] [%(levelname)s] %(message)s")
-handler.setFormatter(formatter)
-logger.addHandler(handler)
-app.logger.addHandler(handler)
+# Chave secreta para sessões
+app.secret_key = secrets.token_hex(16)
 
-# Email
-app.config["MAIL_SERVER"] = os.getenv("MAIL_SERVER", "smtp.office365.com")
-app.config["MAIL_PORT"] = int(os.getenv("MAIL_PORT", 587))
-app.config["MAIL_USERNAME"] = os.environ.get("MAIL_USERNAME")
-app.config["MAIL_PASSWORD"] = os.environ.get("MAIL_PASSWORD")
-app.config["MAIL_USE_TLS"] = True
-app.config["MAIL_USE_SSL"] = False
-
-# Teste de conexão com banco
-try:
-    app.logger.info("🔍 Testando conexão com o banco de dados PostgreSQL...")
-    import psycopg2
-    conn = psycopg2.connect(os.environ.get("DATABASE_URL").replace("+psycopg2", ""))
-    conn.close()
-    app.logger.info("✅ Conexão direta com PostgreSQL bem-sucedida.")
-except Exception as e:
-    app.logger.error(f"❌ Erro ao conectar diretamente com PostgreSQL: {e}")
-
-app.logger.info(f"🔁 DATABASE_URL atual: {os.environ.get('DATABASE_URL')}")
-
+# Configuração do banco (usa DATABASE_URL do .env)
+app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DATABASE_URL")
 
 # Inicializa extensões
 db.init_app(app)
-migrate = Migrate(app, db)
 mail.init_app(app)
+migrate = Migrate(app, db)
 
 # Login Manager
 login_manager = LoginManager()
 login_manager.login_view = 'login'
 login_manager.init_app(app)
-
-@app.route('/')
-def index():
-    return "Sentinel360 está rodando com sucesso no Azure!"
 
 
 @login_manager.user_loader
@@ -203,16 +168,7 @@ def deletar_usuario(user_id):
     return redirect(url_for("usuarios"))
 
 
-# Caminho absoluto para o arquivo SQLite
-basedir = os.path.abspath(os.path.dirname(__file__))
-app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{os.path.join(basedir, 'inventory.db')}"
-app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-app.config["DEBUG"] = True
-app.config["PROPAGATE_EXCEPTIONS"] = True
 
-# associa o SQLAlchemy à aplicação
-db.init_app(app)
-migrate = Migrate(app, db)
 
 from models import Empresa, TipoDevice, TipoSonda, Sensor, Parceiro, Estado, Municipio
 
@@ -625,12 +581,18 @@ def sensors():
 
     sensores = query.order_by(Sensor.criado_em.desc()).all()
 
+    # Listagem paginada de sensores
+    page = request.args.get('page', 1, type=int)
+    pagination = query.order_by(Sensor.id.desc()).paginate(page=page, per_page=10)
+    sensores = pagination.items  # lista de sensores visíveis na página
+
+# Alerta de sensores com calibração próxima (com base em TODOS os sensores, não só os paginados
     hoje = datetime.today().date()
+    todos_sensores = query.all()
     sensores_calibrar = [
-        s for s in sensores
+        s for s in todos_sensores
         if s.proxima_calibracao and s.proxima_calibracao <= hoje + timedelta(days=60)
     ]
-
 
     # listas para os selects
     devices   = TipoDevice.query.order_by(TipoDevice.nome).all()
@@ -641,15 +603,16 @@ def sensors():
 
     return render_template(
         "sensors.html",
-        sensores = sensores,
+        sensores=sensores,
+        pagination=pagination,
         sensores_calibrar=sensores_calibrar,
-        devices  = devices,
-        sondas   = sondas,
-        empresas = empresas,
-        cidades  = cidades,
-        ufs      = ufs,
-        hoje     = hoje,
-        timedelta = timedelta
+        devices=devices,
+        sondas=sondas,
+        empresas=empresas,
+        cidades=cidades,
+        ufs=ufs,
+        hoje=hoje,
+        timedelta=timedelta
     )
 
 @app.route('/delete_sensor/<int:id>', methods=['POST'])
@@ -767,6 +730,76 @@ def remover_certificado(id):
 
     return redirect(url_for('edit_sensor', id=id))
 
+# IMPORTAR EMPRESAS
+@app.route('/importar_empresas', methods=['POST'])
+@login_required
+def importar_empresas():
+    if 'arquivo_csv' not in request.files:
+        flash('Nenhum arquivo enviado.', 'danger')
+        return redirect(url_for('cadastro_empresa'))
+
+    file = request.files['arquivo_csv']
+
+    if file.filename == '':
+        flash('Nenhum arquivo selecionado.', 'warning')
+        return redirect(url_for('cadastro_empresa'))
+
+    if file and file.filename.endswith('.csv'):
+        try:
+            stream = io.StringIO(file.stream.read().decode("utf-8"), newline=None)
+            csv_input = csv.DictReader(stream, delimiter=";")  # <-- AJUSTE AQUI
+
+            importadas = 0
+            ignoradas = 0
+
+            for row in csv_input:
+                print(row)  # <-- AJUDA NA DEPURAÇÃO
+
+                nome = row.get('nome', '').strip()
+                cnpj = row.get('cnpj', '').strip()
+
+                # Validação mínima
+                if not nome or not cnpj:
+                    flash('Linha ignorada por dados incompletos.', 'warning')
+                    ignoradas += 1
+                    continue
+
+                # Verifica se a empresa já existe por CNPJ ou Nome
+                empresa_existente = Empresa.query.filter(
+                    (Empresa.cnpj == cnpj) | (Empresa.nome == nome)
+                ).first()
+
+                if empresa_existente:
+                    flash(f"Empresa '{nome}' já cadastrada.", 'warning')
+                    ignoradas += 1
+                    continue
+
+                # Cria nova empresa
+                nova_empresa = Empresa(
+                    nome=nome,
+                    cnpj=cnpj,
+                    telefone=row.get('telefone', '').strip(),
+                    endereco=row.get('endereco', '').strip(),
+                    cidade=row.get('cidade', '').strip(),
+                    estado=row.get('estado', '').strip(),
+                    cep=row.get('cep', '').strip(),
+                    email=row.get('email', '').strip(),
+                    contato=row.get('contato', '').strip()
+                )
+                db.session.add(nova_empresa)
+                importadas += 1
+
+            db.session.commit()
+            flash(f'{importadas} empresas importadas com sucesso! {ignoradas} linhas ignoradas.', 'success')
+
+        except Exception as e:
+            flash(f'Erro ao importar: {str(e)}', 'danger')
+
+    else:
+        flash('Arquivo inválido. Envie um CSV.', 'danger')
+
+    return redirect(url_for('cadastro_empresa'))
+
 
 
 # CADASTRO DE EMPRESA
@@ -814,7 +847,13 @@ def cadastro_empresa():
 
         return redirect('/cadastro/empresa')
 
+# Listagem de empresas com paginação
+    page = request.args.get('page', 1, type=int)
+    empresas = Empresa.query.order_by(Empresa.nome).paginate(page=page, per_page=10)
+    return render_template('empresa.html', empresas=empresas.items, pagination=empresas)
+
     empresas = Empresa.query.order_by(Empresa.nome).all()
+    
     return render_template('empresa.html', empresas=empresas)
 
 
@@ -1366,15 +1405,6 @@ def delete_parceiro(id):
         flash("Parceiro não encontrado.", "danger")
 
     return redirect(url_for("parceiros"))
-
-#add novo
-import logging
-
-if not app.debug:
-    app.logger.setLevel(logging.INFO)
-
-app.logger.info("🚀 Sentinel360 foi iniciado.")
-
 
 if (__name__ == "__main__"):
     with app.app_context():
