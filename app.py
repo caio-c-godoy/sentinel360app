@@ -1423,3 +1423,10 @@ def delete_parceiro(id):
 
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=int(os.environ.get("PORT", 8000)))
+
+# --- POPULAR ESTADOS AUTOMATICAMENTE NA INICIALIZAÇÃO (UMA VEZ) ---
+import os
+if os.environ.get("POPULATE_ESTADOS") == "1":
+    from popular_estados import popular_estados_municipios
+    with app.app_context():
+        popular_estados_municipios()
