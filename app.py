@@ -38,7 +38,7 @@ app = Flask(__name__)
 app.secret_key = secrets.token_hex(16)
 
 # Configuração do banco (usa DATABASE_URL do .env)
-app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DATABASE_URL")
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get("DATABASE_URL")
 
 # Inicializa extensões
 db.init_app(app)
