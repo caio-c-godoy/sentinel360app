@@ -1,16 +1,14 @@
 {% extends 'base.html' %}
 
 {% block title %}
-<title>Parceiros</title>
+  <title>Parceiros</title>
 {% endblock %}
 
 {% block content %}
 <div class="container py-4">
-    <h2 class="mb-4">Parceiros</h2>
-   
-  {# ──────────────────────────────────────────────── #}
-  {# FORMULÁRIO DE CADASTRO                         #}
-  {# ──────────────────────────────────────────────── #}
+  <h2 class="mb-4">Parceiros</h2>
+
+  {# ─────────────── FORMULÁRIO DE CADASTRO ─────────────── #}
   <form method="POST">
     <div class="row mb-3">
       <div class="col">
@@ -70,12 +68,12 @@
     <div class="row mb-3">
       <div class="col">
         <label class="form-label">CPF:</label>
-        <input type="text" class="form-control" name="cpf" id="cpf" placeholder="Digite o CPF">
+        <input type="text" class="form-control" name="cpf" id="cpf" placeholder="Digite o CPF" />
+        <div id="cpf-error" class="text-danger mt-1" style="display: none; font-size: 0.9em;">
+          CPF inválido. Por favor, verifique.
+        </div>
       </div>
-       <div id="cpf-error" class="text-danger mt-1" style="display: none; font-size: 0.9em;">
-        CPF inválido. Por favor, verifique.
-      </div>
-        <div class="col">
+      <div class="col">
         <label class="form-label">PIX:</label>
         <input type="text" name="pix" class="form-control" />
       </div>
@@ -95,61 +93,40 @@
 
   <hr class="my-4" />
 
-  <!----------Filtros---------->
-
-<form method="GET" class="mb-3">
-  <div class="row g-2 align-items-end">
-
-    <!-- Nome -->
-    <div class="col-md-3">
-      <input type="text" name="f_nome" class="form-control" placeholder="Nome" value="{{ request.args.f_nome or '' }}">
+  {# ─────────────── FILTROS ─────────────── #}
+  <form method="GET" class="mb-3">
+    <div class="row g-2 align-items-end">
+      <div class="col-md-3">
+        <input type="text" name="f_nome" class="form-control" placeholder="Nome" value="{{ request.args.f_nome or '' }}">
+      </div>
+      <div class="col-md-1">
+        <select name="f_uf" class="form-control">
+          <option value="">UF</option>
+          {% for estado in estados %}
+            <option value="{{ estado.sigla }}" {% if request.args.f_uf == estado.sigla %}selected{% endif %}>{{ estado.sigla }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2">
+        <input type="text" name="f_cidade" class="form-control" placeholder="Cidade" value="{{ request.args.f_cidade or '' }}">
+      </div>
+      <div class="col-md-3">
+        <select name="f_empresa" class="form-control">
+          <option value="">Empresa Atendida</option>
+          {% for emp in empresas %}
+            <option value="{{ emp.nome }}" {% if request.args.f_empresa == emp.nome %}selected{% endif %}>{{ emp.nome }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-auto d-flex gap-2">
+        <button type="submit" class="btn btn-outline-primary" title="Filtrar"><i class="fas fa-filter"></i></button>
+        <a href="{{ url_for('parceiros') }}" class="btn btn-outline-secondary" title="Limpar filtros"><i class="fas fa-broom"></i></a>
+        <a href="{{ url_for('exportar_parceiros_csv', **request.args) }}" class="btn btn-outline-success" title="Exportar CSV"><i class="fas fa-file-csv"></i></a>
+      </div>
     </div>
+  </form>
 
-    <!-- UF -->
-    <div class="col-md-1">
-      <select name="f_uf" class="form-control">
-        <option value="">UF</option>
-        {% for estado in estados %}
-          <option value="{{ estado.sigla }}" {% if request.args.f_uf == estado.sigla %}selected{% endif %}>{{ estado.sigla }}</option>
-        {% endfor %}
-      </select>
-    </div>
-
-    <!-- Cidade -->
-    <div class="col-md-2">
-      <input type="text" name="f_cidade" class="form-control" placeholder="Cidade" value="{{ request.args.f_cidade or '' }}">
-    </div>
-
-    <!-- Empresa Atendida -->
-    <div class="col-md-3">
-      <select name="f_empresa" class="form-control">
-        <option value="">Empresa Atendida</option>
-        {% for emp in empresas %}
-          <option value="{{ emp.nome }}" {% if request.args.f_empresa == emp.nome %}selected{% endif %}>{{ emp.nome }}</option>
-        {% endfor %}
-      </select>
-    </div>
-
-    <!-- Botões -->
-    <div class="col-auto d-flex gap-2">
-      <button type="submit" class="btn btn-outline-primary" title="Filtrar">
-        <i class="fas fa-filter"></i>
-      </button>
-      <a href="{{ url_for('parceiros') }}" class="btn btn-outline-secondary" title="Limpar filtros">
-        <i class="fas fa-broom"></i>
-      </a>
-      <a href="{{ url_for('exportar_parceiros_csv', **request.args) }}" class="btn btn-outline-success" title="Exportar CSV">
-        <i class="fas fa-file-csv"></i>
-      </a>
-    </div>
-
-  </div>
-</form>
-
-
-  {# ──────────────────────────────────────────────── #}
-  {# LISTAGEM DOS PARCEIROS                         #}
-  {# ──────────────────────────────────────────────── #}
+  {# ─────────────── LISTAGEM DE PARCEIROS ─────────────── #}
   <h4 class="mb-3">Parceiros Cadastrados</h4>
   <table class="table table-bordered table-sm">
     <thead class="table-light">
@@ -159,8 +136,7 @@
         <th>Cidade</th>
         <th>UF</th>
         <th>Empresas Atendidas</th>
-        <th>Ações</th> 
-        
+        <th>Ações</th>
       </tr>
     </thead>
     <tbody>
@@ -180,124 +156,109 @@
             {% endif %}
           </td>
           <td>
-              <div class="d-flex flex-row" style="gap: 4px;">
-                  <form action="{{ url_for('editar_parceiro', id=p.id) }}" method="GET">
-                    <button type="submit" class="btn btn-sm btn-outline-primary" title="Editar">
-                        <i class="fas fa-pencil-alt"></i>
+            <div class="d-flex flex-row gap-1">
+              <form action="{{ url_for('editar_parceiro', id=p.id) }}" method="GET">
+                <button type="submit" class="btn btn-sm btn-outline-primary" title="Editar">
+                  <i class="fas fa-pencil-alt"></i>
                 </button>
-            </form>
-                  <form action="{{ url_for('delete_parceiro', id=p.id) }}" method="POST" onsubmit="return confirm('Tem certeza que deseja excluir este parceiro?');">
-                     <button type="submit" class="btn btn-sm btn-outline-danger" title="Excluir">
-                         <i class="fas fa-trash"></i>
+              </form>
+              <form action="{{ url_for('delete_parceiro', id=p.id) }}" method="POST" onsubmit="return confirm('Tem certeza que deseja excluir este parceiro?');">
+                <button type="submit" class="btn btn-sm btn-outline-danger" title="Excluir">
+                  <i class="fas fa-trash"></i>
                 </button>
-            </form>
-        </td>
+              </form>
+            </div>
+          </td>
         </tr>
       {% endfor %}
     </tbody>
   </table>
 </div>
 
-
+<!-- Scripts -->
 <script>
-document.getElementById("cep").addEventListener("blur", function () {
+document.addEventListener("DOMContentLoaded", function () {
+  const cepInput = document.getElementById("cep");
+  const ufSelect = document.getElementById("uf");
+  const cidadeSelect = document.getElementById("cidade");
+
+  cepInput.addEventListener("blur", function () {
     const cep = this.value.replace(/\D/g, "");
     if (cep.length !== 8) return;
 
     fetch(`https://viacep.com.br/ws/${cep}/json/`)
-        .then(response => response.json())
-        .then(data => {
-            if (data.erro) {
-                alert("CEP não encontrado.");
-                return;
-            }
+      .then(response => response.json())
+      .then(data => {
+        if (data.erro) {
+          alert("CEP não encontrado.");
+          return;
+        }
 
-            document.getElementById("rua").value = data.logradouro || "";
-            document.getElementById("bairro").value = data.bairro || "";
-            document.getElementById("uf").value = data.uf || "";
+        document.getElementById("rua").value = data.logradouro || "";
+        document.getElementById("bairro").value = data.bairro || "";
 
-            // Atualiza os municípios (aguarda o endpoint /municipios/UF)
-            fetch(`/municipios/${data.uf}`)
-                .then(res => res.json())
-                .then(municipios => {
-                    const cidadeSelect = document.getElementById("cidade");
-                    cidadeSelect.innerHTML = ""; // limpa antes
+        const uf = (data.uf || "").toUpperCase();
+        let foundUF = false;
+        for (const opt of ufSelect.options) {
+          if (opt.value.toUpperCase() === uf) {
+            ufSelect.value = opt.value;
+            foundUF = true;
+            break;
+          }
+        }
 
-                    municipios.forEach(m => {
-                        const opt = document.createElement("option");
-                        opt.value = m;
-                        opt.text = m;
-                        if (m === data.localidade) opt.selected = true;
-                        cidadeSelect.appendChild(opt);
-                    });
-                });
-        })
-        .catch(err => {
-            console.error("Erro ao buscar CEP:", err);
-        });
-});
-</script>
+        if (!foundUF) {
+          console.warn("UF não encontrado na lista:", uf);
+          return;
+        }
 
+        // Aguarda para garantir que o UF foi aceito antes de buscar as cidades
+        setTimeout(() => {
+          fetch(`/get_municipios/${uf}`)
+            .then(res => res.json())
+            .then(municipios => {
+              cidadeSelect.innerHTML = '<option value="">Selecione</option>';
 
-<!-- Campo hidden para restaurar cidade -->
-<input type="hidden" id="cidade-selecionada" value="{{ request.form.get('cidade') or request.args.get('cidade', '') }}">
+              municipios.forEach(cidade => {
+                const opt = document.createElement("option");
+                opt.value = cidade;
+                opt.text = cidade;
+                cidadeSelect.appendChild(opt);
+              });
 
-<!--------UF-cidade-dinamica-------->
-
-<script>
-  document.addEventListener("DOMContentLoaded", function () {
-    const ufSelect = document.querySelector('select[name="uf"]');
-    const cidadeSelect = document.querySelector('select[name="cidade"]');
-
-    if (ufSelect && cidadeSelect) {
-      ufSelect.addEventListener("change", function () {
-        const uf = this.value;
-        fetch(`/get_municipios/${uf}`)
-          .then(response => response.json())
-          .then(data => {
-            cidadeSelect.innerHTML = '';
-            data.forEach(cidade => {
-              const option = document.createElement("option");
-              option.value = cidade;
-              option.text = cidade;
-              cidadeSelect.appendChild(option);
+              const cidadeViaCEP = (data.localidade || "").toLowerCase().trim();
+              const optionToSelect = Array.from(cidadeSelect.options).find(
+                opt => opt.value.toLowerCase().trim() === cidadeViaCEP
+              );
+              if (optionToSelect) {
+                optionToSelect.selected = true;
+              } else {
+                console.warn("Cidade do CEP não encontrada:", cidadeViaCEP);
+              }
             });
-          });
-      });
-    }
+        }, 200);
+      })
+      .catch(err => console.error("Erro ao buscar CEP:", err));
   });
-</script>
 
+  ufSelect.addEventListener("change", function () {
+    const uf = this.value;
+    fetch(`/get_municipios/${uf}`)
+      .then(response => response.json())
+      .then(data => {
+        cidadeSelect.innerHTML = '<option value="">Selecione</option>';
+        data.forEach(cidade => {
+          const option = document.createElement("option");
+          option.value = cidade;
+          option.text = cidade;
+          cidadeSelect.appendChild(option);
+        });
+      });
+  });
 
-<!--validacao cpf-->
-
-<script>
-  function validarCPF(cpf) {
-    cpf = cpf.replace(/[^\d]+/g, '');
-    if (cpf.length !== 11 || /^(\d)\1+$/.test(cpf)) return false;
-
-    let soma = 0;
-    for (let i = 0; i < 9; i++) soma += parseInt(cpf.charAt(i)) * (10 - i);
-    let resto = 11 - (soma % 11);
-    if (resto === 10 || resto === 11) resto = 0;
-    if (resto !== parseInt(cpf.charAt(9))) return false;
-
-    soma = 0;
-    for (let i = 0; i < 10; i++) soma += parseInt(cpf.charAt(i)) * (11 - i);
-    resto = 11 - (soma % 11);
-    if (resto === 10 || resto === 11) resto = 0;
-
-    return resto === parseInt(cpf.charAt(10));
-  }
-
+  // Validação e formatação de CPF
   const cpfInput = document.getElementById('cpf');
-  const errorDiv = document.createElement('div');
-  errorDiv.id = 'cpf-error';
-  errorDiv.className = 'text-danger mt-1';
-  errorDiv.style.display = 'none';
-  errorDiv.style.fontSize = '0.9em';
-  errorDiv.textContent = 'CPF inválido. Por favor, verifique.';
-  cpfInput.parentNode.appendChild(errorDiv);
+  const cpfError = document.getElementById('cpf-error');
 
   cpfInput.addEventListener('input', function () {
     let v = this.value.replace(/\D/g, '');
@@ -309,16 +270,38 @@ document.getElementById("cep").addEventListener("blur", function () {
   });
 
   cpfInput.addEventListener('blur', function () {
-    if (!validarCPF(this.value)) {
+    const cpf = this.value.replace(/\D/g, '');
+    let soma = 0, resto;
+
+    if (cpf.length !== 11 || /^(\d)\1+$/.test(cpf)) {
+      cpfError.style.display = 'block';
       this.classList.add("is-invalid");
-      errorDiv.style.display = 'block';
-    } else {
-      this.classList.remove("is-invalid");
-      errorDiv.style.display = 'none';
+      return;
     }
+
+    for (let i = 0; i < 9; i++) soma += cpf[i] * (10 - i);
+    resto = (soma * 10) % 11;
+    if (resto === 10) resto = 0;
+    if (resto !== parseInt(cpf[9])) {
+      cpfError.style.display = 'block';
+      this.classList.add("is-invalid");
+      return;
+    }
+
+    soma = 0;
+    for (let i = 0; i < 10; i++) soma += cpf[i] * (11 - i);
+    resto = (soma * 10) % 11;
+    if (resto === 10) resto = 0;
+
+    if (resto !== parseInt(cpf[10])) {
+      cpfError.style.display = 'block';
+      this.classList.add("is-invalid");
+      return;
+    }
+
+    cpfError.style.display = 'none';
+    this.classList.remove("is-invalid");
   });
+});
 </script>
-
-
-
 {% endblock %}

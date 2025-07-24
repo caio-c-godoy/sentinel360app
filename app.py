@@ -6,6 +6,7 @@ import csv
 import json
 import string
 import secrets
+import requests
 from io import StringIO, TextIOWrapper
 from datetime import datetime, timedelta, date
 from pathlib import Path
@@ -1291,6 +1292,20 @@ def parceiros():
         estados=estados,
         cidades=cidades # Added cities to context for template if needed
     )
+
+
+@app.route('/buscar_cep/<cep>')
+def buscar_cep(cep):
+    try:
+        r = requests.get(f'https://viacep.com.br/ws/{cep}/json/')
+        data = r.json()
+        if "erro" in data:
+            return jsonify({"erro": "CEP não encontrado"}), 404
+        return jsonify(data)
+    except Exception as e:
+        return jsonify({"erro": "Erro ao buscar CEP", "detalhes": str(e)}), 500
+
+
 @app.route("/municipios/<uf>")
 def municipios_por_uf(uf):
     estado = Estado.query.filter_by(sigla=uf).first()
