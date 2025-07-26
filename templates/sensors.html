@@ -28,7 +28,7 @@
             <div class="row mb-3">
                 <div class="col">
                     <label class="form-label">Tipo de Device:</label>
-                    <select name="tipo_device" class="form-control" required>
+                    <select name="tipo_device" class="form-control">
                         <option value="">Tipo de Device</option>
                         {% for device in devices %}
                             <option value="{{ device.id }}">{{ device.nome }}</option>
